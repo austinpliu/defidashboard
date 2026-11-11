@@ -1,24 +1,24 @@
 {
-  "generatedAt": "2026-11-10T19:59:35.170Z",
-  "durationSec": 419,
+  "generatedAt": "2026-11-11T06:56:14.728Z",
+  "durationSec": 398,
   "run": {
-    "id": "42889612488",
-    "url": "https://github.com/austinpliu/defidashboard/actions/runs/42889612488",
+    "id": "42975124106",
+    "url": "https://github.com/austinpliu/defidashboard/actions/runs/42975124106",
     "trigger": "schedule"
   },
   "counts": {
     "requests": 142,
-    "failed": 6,
+    "failed": 7,
     "protocols": 10,
     "tokens": 10,
     "catalysts": 105,
-    "coins": 445,
+    "coins": 446,
     "predictionMarkets": 25
   },
   "problems": [
     {
       "severity": "info",
-      "message": "Category TVL: DefiLlama's free protocol list doesn't mark double-counted or liquid-staking TVL per protocol, so whole categories are left out by rule; the rest adds up to 129.09% of the headline TVL, so category shares are of that total (explained on the Overview)"
+      "message": "Category TVL: DefiLlama's free protocol list doesn't mark double-counted or liquid-staking TVL per protocol, so whole categories are left out by rule; the rest adds up to 128.86% of the headline TVL, so category shares are of that total (explained on the Overview)"
     },
     {
       "severity": "info",
@@ -33,21 +33,9 @@
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:52:36.532Z",
-      "ms": 177,
-      "bytes": 572472,
-      "attempts": 1
-    },
-    {
-      "label": "DefiLlama total stablecoin supply history",
-      "method": "GET",
-      "url": "https://stablecoins.llama.fi/stablecoincharts/all",
-      "status": 200,
-      "ok": true,
-      "error": null,
-      "fetchedAt": "2026-11-10T19:52:36.811Z",
-      "ms": 49,
-      "bytes": 1345382,
+      "fetchedAt": "2026-11-11T06:49:36.810Z",
+      "ms": 106,
+      "bytes": 573481,
       "attempts": 1
     },
     {
@@ -57,9 +45,21 @@
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:52:36.810Z",
-      "ms": 90,
-      "bytes": 58086,
+      "fetchedAt": "2026-11-11T06:49:37.059Z",
+      "ms": 38,
+      "bytes": 58089,
+      "attempts": 1
+    },
+    {
+      "label": "DefiLlama total stablecoin supply history",
+      "method": "GET",
+      "url": "https://stablecoins.llama.fi/stablecoincharts/all",
+      "status": 200,
+      "ok": true,
+      "error": null,
+      "fetchedAt": "2026-11-11T06:49:37.060Z",
+      "ms": 46,
+      "bytes": 1347003,
       "attempts": 1
     },
     {
@@ -69,9 +69,9 @@
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:52:36.510Z",
-      "ms": 426,
-      "bytes": 9553918,
+      "fetchedAt": "2026-11-11T06:49:36.760Z",
+      "ms": 436,
+      "bytes": 9567451,
       "attempts": 1
     },
     {
@@ -81,9 +81,9 @@
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:52:36.533Z",
-      "ms": 534,
-      "bytes": 10681770,
+      "fetchedAt": "2026-11-11T06:49:36.811Z",
+      "ms": 526,
+      "bytes": 10705775,
       "attempts": 1
     },
     {
@@ -93,9 +93,9 @@
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:52:37.110Z",
-      "ms": 29,
-      "bytes": 123730,
+      "fetchedAt": "2026-11-11T06:49:37.386Z",
+      "ms": 26,
+      "bytes": 123768,
       "attempts": 1
     },
     {
@@ -105,33 +105,9 @@
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:52:37.411Z",
-      "ms": 2172,
-      "bytes": 5758269,
-      "attempts": 1
-    },
-    {
-      "label": "DefiLlama hacks (may be Pro-only)",
-      "method": "GET",
-      "url": "https://api.llama.fi/hacks",
-      "status": 200,
-      "ok": true,
-      "error": null,
-      "fetchedAt": "2026-11-10T19:52:39.612Z",
-      "ms": 38,
-      "bytes": 783128,
-      "attempts": 1
-    },
-    {
-      "label": "DefiLlama DEX volume overview",
-      "method": "GET",
-      "url": "https://api.llama.fi/overview/dexs?excludeTotalDataChartBreakdown=true",
-      "status": 200,
-      "ok": true,
-      "error": null,
-      "fetchedAt": "2026-11-10T19:52:38.010Z",
-      "ms": 1787,
-      "bytes": 2501014,
+      "fetchedAt": "2026-11-11T06:49:37.659Z",
+      "ms": 60,
+      "bytes": 5774075,
       "attempts": 1
     },
     {
@@ -141,9 +117,33 @@
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:52:37.711Z",
-      "ms": 2118,
-      "bytes": 5307203,
+      "fetchedAt": "2026-11-11T06:49:37.959Z",
+      "ms": 46,
+      "bytes": 5321615,
+      "attempts": 1
+    },
+    {
+      "label": "DefiLlama DEX volume overview",
+      "method": "GET",
+      "url": "https://api.llama.fi/overview/dexs?excludeTotalDataChartBreakdown=true",
+      "status": 200,
+      "ok": true,
+      "error": null,
+      "fetchedAt": "2026-11-11T06:49:38.259Z",
+      "ms": 33,
+      "bytes": 2506288,
+      "attempts": 1
+    },
+    {
+      "label": "DefiLlama hacks (may be Pro-only)",
+      "method": "GET",
+      "url": "https://api.llama.fi/hacks",
+      "status": 200,
+      "ok": true,
+      "error": null,
+      "fetchedAt": "2026-11-11T06:49:38.559Z",
+      "ms": 24,
+      "bytes": 784807,
       "attempts": 1
     },
     {
@@ -153,8 +153,8 @@
       "status": 402,
       "ok": false,
       "error": "HTTP 402: Upgrade to the paid API plan at https://defillama.com/subscription",
-      "fetchedAt": "2026-11-10T19:52:39.913Z",
-      "ms": 28,
+      "fetchedAt": "2026-11-11T06:49:38.859Z",
+      "ms": 10,
       "bytes": 66,
       "attempts": 1
     },
@@ -165,8 +165,8 @@
       "status": 402,
       "ok": false,
       "error": "HTTP 402: Upgrade to the paid API plan at https://defillama.com/subscription",
-      "fetchedAt": "2026-11-10T19:52:40.212Z",
-      "ms": 37,
+      "fetchedAt": "2026-11-11T06:49:39.159Z",
+      "ms": 10,
       "bytes": 66,
       "attempts": 1
     },
@@ -177,21 +177,9 @@
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:52:40.512Z",
-      "ms": 27,
-      "bytes": 123042,
-      "attempts": 1
-    },
-    {
-      "label": "DefiLlama BSC TVL history",
-      "method": "GET",
-      "url": "https://api.llama.fi/v2/historicalChainTvl/BSC",
-      "status": 200,
-      "ok": true,
-      "error": null,
-      "fetchedAt": "2026-11-10T19:52:41.412Z",
-      "ms": 28,
-      "bytes": 81705,
+      "fetchedAt": "2026-11-11T06:49:39.460Z",
+      "ms": 17,
+      "bytes": 123080,
       "attempts": 1
     },
     {
@@ -201,21 +189,21 @@
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:52:40.811Z",
-      "ms": 682,
-      "bytes": 60254,
+      "fetchedAt": "2026-11-11T06:49:39.759Z",
+      "ms": 16,
+      "bytes": 60291,
       "attempts": 1
     },
     {
-      "label": "DefiLlama Tron TVL history",
+      "label": "DefiLlama BSC TVL history",
       "method": "GET",
-      "url": "https://api.llama.fi/v2/historicalChainTvl/Tron",
+      "url": "https://api.llama.fi/v2/historicalChainTvl/BSC",
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:52:41.712Z",
-      "ms": 34,
-      "bytes": 88744,
+      "fetchedAt": "2026-11-11T06:49:40.060Z",
+      "ms": 17,
+      "bytes": 81742,
       "attempts": 1
     },
     {
@@ -225,9 +213,21 @@
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:52:41.112Z",
-      "ms": 657,
-      "bytes": 75984,
+      "fetchedAt": "2026-11-11T06:49:40.359Z",
+      "ms": 15,
+      "bytes": 76021,
+      "attempts": 1
+    },
+    {
+      "label": "DefiLlama Tron TVL history",
+      "method": "GET",
+      "url": "https://api.llama.fi/v2/historicalChainTvl/Tron",
+      "status": 200,
+      "ok": true,
+      "error": null,
+      "fetchedAt": "2026-11-11T06:49:40.660Z",
+      "ms": 15,
+      "bytes": 88781,
       "attempts": 1
     },
     {
@@ -237,9 +237,9 @@
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:52:42.012Z",
-      "ms": 43,
-      "bytes": 74779,
+      "fetchedAt": "2026-11-11T06:49:40.960Z",
+      "ms": 15,
+      "bytes": 74816,
       "attempts": 1
     },
     {
@@ -249,9 +249,9 @@
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:52:42.068Z",
-      "ms": 63,
-      "bytes": 474553,
+      "fetchedAt": "2026-11-11T06:49:40.991Z",
+      "ms": 20,
+      "bytes": 474713,
       "attempts": 1
     },
     {
@@ -261,33 +261,9 @@
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:52:42.368Z",
-      "ms": 37,
-      "bytes": 399163,
-      "attempts": 1
-    },
-    {
-      "label": "DefiLlama USDS supply history",
-      "method": "GET",
-      "url": "https://stablecoins.llama.fi/stablecoincharts/all?stablecoin=209",
-      "status": 200,
-      "ok": true,
-      "error": null,
-      "fetchedAt": "2026-11-10T19:52:42.667Z",
-      "ms": 771,
-      "bytes": 88628,
-      "attempts": 1
-    },
-    {
-      "label": "DefiLlama DAI supply history",
-      "method": "GET",
-      "url": "https://stablecoins.llama.fi/stablecoincharts/all?stablecoin=5",
-      "status": 200,
-      "ok": true,
-      "error": null,
-      "fetchedAt": "2026-11-10T19:52:43.439Z",
-      "ms": 30,
-      "bytes": 287196,
+      "fetchedAt": "2026-11-11T06:49:41.291Z",
+      "ms": 22,
+      "bytes": 399321,
       "attempts": 1
     },
     {
@@ -297,57 +273,33 @@
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:52:42.969Z",
-      "ms": 859,
-      "bytes": 122610,
+      "fetchedAt": "2026-11-11T06:49:41.890Z",
+      "ms": 43,
+      "bytes": 122763,
       "attempts": 1
     },
     {
-      "label": "DefiLlama fees maple",
+      "label": "DefiLlama USDS supply history",
       "method": "GET",
-      "url": "https://api.llama.fi/summary/fees/maple?dataType=dailyFees",
+      "url": "https://stablecoins.llama.fi/stablecoincharts/all?stablecoin=209",
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:52:44.206Z",
-      "ms": 28,
-      "bytes": 136043,
+      "fetchedAt": "2026-11-11T06:49:41.591Z",
+      "ms": 609,
+      "bytes": 88741,
       "attempts": 1
     },
     {
-      "label": "DefiLlama revenue maple",
+      "label": "DefiLlama DAI supply history",
       "method": "GET",
-      "url": "https://api.llama.fi/summary/fees/maple?dataType=dailyRevenue",
+      "url": "https://stablecoins.llama.fi/stablecoincharts/all?stablecoin=5",
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:52:44.506Z",
-      "ms": 30,
-      "bytes": 133163,
-      "attempts": 1
-    },
-    {
-      "label": "DefiLlama holders revenue maple",
-      "method": "GET",
-      "url": "https://api.llama.fi/summary/fees/maple?dataType=dailyHoldersRevenue",
-      "status": 200,
-      "ok": true,
-      "error": null,
-      "fetchedAt": "2026-11-10T19:52:44.806Z",
-      "ms": 31,
-      "bytes": 129968,
-      "attempts": 1
-    },
-    {
-      "label": "DefiLlama protocol aave",
-      "method": "GET",
-      "url": "https://api.llama.fi/protocol/aave",
-      "status": 200,
-      "ok": true,
-      "error": null,
-      "fetchedAt": "2026-11-10T19:52:45.107Z",
-      "ms": 110,
-      "bytes": 10984992,
+      "fetchedAt": "2026-11-11T06:49:42.191Z",
+      "ms": 21,
+      "bytes": 287308,
       "attempts": 1
     },
     {
@@ -357,9 +309,57 @@
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:52:43.906Z",
-      "ms": 1452,
-      "bytes": 2418525,
+      "fetchedAt": "2026-11-11T06:49:42.303Z",
+      "ms": 26,
+      "bytes": 2420786,
+      "attempts": 1
+    },
+    {
+      "label": "DefiLlama fees maple",
+      "method": "GET",
+      "url": "https://api.llama.fi/summary/fees/maple?dataType=dailyFees",
+      "status": 200,
+      "ok": true,
+      "error": null,
+      "fetchedAt": "2026-11-11T06:49:42.603Z",
+      "ms": 20,
+      "bytes": 136101,
+      "attempts": 1
+    },
+    {
+      "label": "DefiLlama revenue maple",
+      "method": "GET",
+      "url": "https://api.llama.fi/summary/fees/maple?dataType=dailyRevenue",
+      "status": 200,
+      "ok": true,
+      "error": null,
+      "fetchedAt": "2026-11-11T06:49:42.904Z",
+      "ms": 16,
+      "bytes": 133229,
+      "attempts": 1
+    },
+    {
+      "label": "DefiLlama holders revenue maple",
+      "method": "GET",
+      "url": "https://api.llama.fi/summary/fees/maple?dataType=dailyHoldersRevenue",
+      "status": 200,
+      "ok": true,
+      "error": null,
+      "fetchedAt": "2026-11-11T06:49:43.204Z",
+      "ms": 18,
+      "bytes": 130033,
+      "attempts": 1
+    },
+    {
+      "label": "DefiLlama protocol aave",
+      "method": "GET",
+      "url": "https://api.llama.fi/protocol/aave",
+      "status": 200,
+      "ok": true,
+      "error": null,
+      "fetchedAt": "2026-11-11T06:49:43.503Z",
+      "ms": 123,
+      "bytes": 10994429,
       "attempts": 1
     },
     {
@@ -369,45 +369,9 @@
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:52:45.407Z",
-      "ms": 30,
-      "bytes": 740638,
-      "attempts": 1
-    },
-    {
-      "label": "DefiLlama holders revenue aave",
-      "method": "GET",
-      "url": "https://api.llama.fi/summary/fees/aave?dataType=dailyHoldersRevenue",
-      "status": 200,
-      "ok": true,
-      "error": null,
-      "fetchedAt": "2026-11-10T19:52:46.005Z",
-      "ms": 35,
-      "bytes": 651660,
-      "attempts": 1
-    },
-    {
-      "label": "DefiLlama protocol ondo-finance",
-      "method": "GET",
-      "url": "https://api.llama.fi/protocol/ondo-finance",
-      "status": 200,
-      "ok": true,
-      "error": null,
-      "fetchedAt": "2026-11-10T19:52:46.305Z",
-      "ms": 179,
-      "bytes": 823,
-      "attempts": 1
-    },
-    {
-      "label": "DefiLlama fees ondo-finance",
-      "method": "GET",
-      "url": "https://api.llama.fi/summary/fees/ondo-finance?dataType=dailyFees",
-      "status": 200,
-      "ok": true,
-      "error": null,
-      "fetchedAt": "2026-11-10T19:52:46.607Z",
-      "ms": 37,
-      "bytes": 200956,
+      "fetchedAt": "2026-11-11T06:49:43.803Z",
+      "ms": 19,
+      "bytes": 741318,
       "attempts": 1
     },
     {
@@ -417,9 +381,45 @@
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:52:45.707Z",
-      "ms": 1111,
-      "bytes": 723050,
+      "fetchedAt": "2026-11-11T06:49:44.103Z",
+      "ms": 18,
+      "bytes": 723681,
+      "attempts": 1
+    },
+    {
+      "label": "DefiLlama holders revenue aave",
+      "method": "GET",
+      "url": "https://api.llama.fi/summary/fees/aave?dataType=dailyHoldersRevenue",
+      "status": 200,
+      "ok": true,
+      "error": null,
+      "fetchedAt": "2026-11-11T06:49:44.403Z",
+      "ms": 21,
+      "bytes": 652271,
+      "attempts": 1
+    },
+    {
+      "label": "DefiLlama protocol ondo-finance",
+      "method": "GET",
+      "url": "https://api.llama.fi/protocol/ondo-finance",
+      "status": 200,
+      "ok": true,
+      "error": null,
+      "fetchedAt": "2026-11-11T06:49:44.704Z",
+      "ms": 16,
+      "bytes": 822,
+      "attempts": 1
+    },
+    {
+      "label": "DefiLlama fees ondo-finance",
+      "method": "GET",
+      "url": "https://api.llama.fi/summary/fees/ondo-finance?dataType=dailyFees",
+      "status": 200,
+      "ok": true,
+      "error": null,
+      "fetchedAt": "2026-11-11T06:49:45.003Z",
+      "ms": 19,
+      "bytes": 201369,
       "attempts": 1
     },
     {
@@ -429,9 +429,9 @@
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:52:46.906Z",
-      "ms": 29,
-      "bytes": 184097,
+      "fetchedAt": "2026-11-11T06:49:45.304Z",
+      "ms": 18,
+      "bytes": 184454,
       "attempts": 1
     },
     {
@@ -441,21 +441,9 @@
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:52:47.207Z",
-      "ms": 826,
-      "bytes": 167045,
-      "attempts": 1
-    },
-    {
-      "label": "DefiLlama revenue centrifuge",
-      "method": "GET",
-      "url": "https://api.llama.fi/summary/fees/centrifuge?dataType=dailyRevenue",
-      "status": 200,
-      "ok": true,
-      "error": null,
-      "fetchedAt": "2026-11-10T19:52:48.106Z",
-      "ms": 37,
-      "bytes": 93336,
+      "fetchedAt": "2026-11-11T06:49:45.603Z",
+      "ms": 16,
+      "bytes": 167402,
       "attempts": 1
     },
     {
@@ -465,8 +453,8 @@
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:52:47.507Z",
-      "ms": 649,
+      "fetchedAt": "2026-11-11T06:49:45.904Z",
+      "ms": 15,
       "bytes": 2716,
       "attempts": 1
     },
@@ -477,21 +465,21 @@
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:52:47.807Z",
-      "ms": 864,
-      "bytes": 95045,
+      "fetchedAt": "2026-11-11T06:49:46.203Z",
+      "ms": 18,
+      "bytes": 95304,
       "attempts": 1
     },
     {
-      "label": "DefiLlama child protocol ondo-yield-assets",
+      "label": "DefiLlama revenue centrifuge",
       "method": "GET",
-      "url": "https://api.llama.fi/protocol/ondo-yield-assets",
+      "url": "https://api.llama.fi/summary/fees/centrifuge?dataType=dailyRevenue",
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:52:48.705Z",
-      "ms": 42,
-      "bytes": 974,
+      "fetchedAt": "2026-11-11T06:49:46.503Z",
+      "ms": 17,
+      "bytes": 93596,
       "attempts": 1
     },
     {
@@ -501,9 +489,21 @@
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:52:48.407Z",
-      "ms": 668,
-      "bytes": 85355,
+      "fetchedAt": "2026-11-11T06:49:46.803Z",
+      "ms": 17,
+      "bytes": 85604,
+      "attempts": 1
+    },
+    {
+      "label": "DefiLlama child protocol ondo-yield-assets",
+      "method": "GET",
+      "url": "https://api.llama.fi/protocol/ondo-yield-assets",
+      "status": 200,
+      "ok": true,
+      "error": null,
+      "fetchedAt": "2026-11-11T06:49:47.104Z",
+      "ms": 15,
+      "bytes": 974,
       "attempts": 1
     },
     {
@@ -513,8 +513,8 @@
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:52:49.006Z",
-      "ms": 664,
+      "fetchedAt": "2026-11-11T06:49:47.402Z",
+      "ms": 18,
       "bytes": 1041,
       "attempts": 1
     },
@@ -525,8 +525,8 @@
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:52:49.307Z",
-      "ms": 652,
+      "fetchedAt": "2026-11-11T06:49:47.704Z",
+      "ms": 15,
       "bytes": 1069,
       "attempts": 1
     },
@@ -537,8 +537,8 @@
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:52:49.605Z",
-      "ms": 644,
+      "fetchedAt": "2026-11-11T06:49:48.003Z",
+      "ms": 16,
       "bytes": 2342,
       "attempts": 1
     },
@@ -549,33 +549,9 @@
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:52:49.906Z",
-      "ms": 620,
+      "fetchedAt": "2026-11-11T06:49:48.303Z",
+      "ms": 15,
       "bytes": 1128,
-      "attempts": 1
-    },
-    {
-      "label": "DefiLlama fees sky",
-      "method": "GET",
-      "url": "https://api.llama.fi/summary/fees/sky?dataType=dailyFees",
-      "status": 200,
-      "ok": true,
-      "error": null,
-      "fetchedAt": "2026-11-10T19:52:50.505Z",
-      "ms": 972,
-      "bytes": 184814,
-      "attempts": 1
-    },
-    {
-      "label": "DefiLlama revenue sky",
-      "method": "GET",
-      "url": "https://api.llama.fi/summary/fees/sky?dataType=dailyRevenue",
-      "status": 200,
-      "ok": true,
-      "error": null,
-      "fetchedAt": "2026-11-10T19:52:50.807Z",
-      "ms": 990,
-      "bytes": 182776,
       "attempts": 1
     },
     {
@@ -585,21 +561,33 @@
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:52:50.207Z",
-      "ms": 1836,
-      "bytes": 2741145,
+      "fetchedAt": "2026-11-11T06:49:48.603Z",
+      "ms": 29,
+      "bytes": 2742335,
       "attempts": 1
     },
     {
-      "label": "DefiLlama fees hyperliquid",
+      "label": "DefiLlama fees sky",
       "method": "GET",
-      "url": "https://api.llama.fi/summary/fees/hyperliquid?dataType=dailyFees",
+      "url": "https://api.llama.fi/summary/fees/sky?dataType=dailyFees",
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:52:52.101Z",
-      "ms": 27,
-      "bytes": 112312,
+      "fetchedAt": "2026-11-11T06:49:48.904Z",
+      "ms": 15,
+      "bytes": 184902,
+      "attempts": 1
+    },
+    {
+      "label": "DefiLlama revenue sky",
+      "method": "GET",
+      "url": "https://api.llama.fi/summary/fees/sky?dataType=dailyRevenue",
+      "status": 200,
+      "ok": true,
+      "error": null,
+      "fetchedAt": "2026-11-11T06:49:49.204Z",
+      "ms": 19,
+      "bytes": 182862,
       "attempts": 1
     },
     {
@@ -609,33 +597,9 @@
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:52:51.478Z",
-      "ms": 778,
-      "bytes": 165886,
-      "attempts": 1
-    },
-    {
-      "label": "DefiLlama revenue hyperliquid",
-      "method": "GET",
-      "url": "https://api.llama.fi/summary/fees/hyperliquid?dataType=dailyRevenue",
-      "status": 200,
-      "ok": true,
-      "error": null,
-      "fetchedAt": "2026-11-10T19:52:52.398Z",
-      "ms": 27,
-      "bytes": 109178,
-      "attempts": 1
-    },
-    {
-      "label": "DefiLlama holders revenue hyperliquid",
-      "method": "GET",
-      "url": "https://api.llama.fi/summary/fees/hyperliquid?dataType=dailyHoldersRevenue",
-      "status": 200,
-      "ok": true,
-      "error": null,
-      "fetchedAt": "2026-11-10T19:52:52.697Z",
-      "ms": 28,
-      "bytes": 95718,
+      "fetchedAt": "2026-11-11T06:49:49.503Z",
+      "ms": 17,
+      "bytes": 165972,
       "attempts": 1
     },
     {
@@ -645,9 +609,45 @@
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:52:51.798Z",
-      "ms": 1144,
-      "bytes": 614444,
+      "fetchedAt": "2026-11-11T06:49:49.802Z",
+      "ms": 17,
+      "bytes": 615747,
+      "attempts": 1
+    },
+    {
+      "label": "DefiLlama fees hyperliquid",
+      "method": "GET",
+      "url": "https://api.llama.fi/summary/fees/hyperliquid?dataType=dailyFees",
+      "status": 200,
+      "ok": true,
+      "error": null,
+      "fetchedAt": "2026-11-11T06:49:50.103Z",
+      "ms": 16,
+      "bytes": 112482,
+      "attempts": 1
+    },
+    {
+      "label": "DefiLlama revenue hyperliquid",
+      "method": "GET",
+      "url": "https://api.llama.fi/summary/fees/hyperliquid?dataType=dailyRevenue",
+      "status": 200,
+      "ok": true,
+      "error": null,
+      "fetchedAt": "2026-11-11T06:49:50.403Z",
+      "ms": 16,
+      "bytes": 109341,
+      "attempts": 1
+    },
+    {
+      "label": "DefiLlama holders revenue hyperliquid",
+      "method": "GET",
+      "url": "https://api.llama.fi/summary/fees/hyperliquid?dataType=dailyHoldersRevenue",
+      "status": 200,
+      "ok": true,
+      "error": null,
+      "fetchedAt": "2026-11-11T06:49:50.703Z",
+      "ms": 17,
+      "bytes": 95861,
       "attempts": 1
     },
     {
@@ -657,9 +657,9 @@
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:52:52.999Z",
-      "ms": 71,
-      "bytes": 9085496,
+      "fetchedAt": "2026-11-11T06:49:51.002Z",
+      "ms": 60,
+      "bytes": 9094101,
       "attempts": 1
     },
     {
@@ -669,21 +669,9 @@
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:52:53.298Z",
-      "ms": 30,
-      "bytes": 307139,
-      "attempts": 1
-    },
-    {
-      "label": "DefiLlama holders revenue pendle",
-      "method": "GET",
-      "url": "https://api.llama.fi/summary/fees/pendle?dataType=dailyHoldersRevenue",
-      "status": 200,
-      "ok": true,
-      "error": null,
-      "fetchedAt": "2026-11-10T19:52:53.898Z",
-      "ms": 31,
-      "bytes": 293295,
+      "fetchedAt": "2026-11-11T06:49:51.303Z",
+      "ms": 17,
+      "bytes": 307422,
       "attempts": 1
     },
     {
@@ -693,9 +681,33 @@
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:52:53.598Z",
-      "ms": 946,
-      "bytes": 306676,
+      "fetchedAt": "2026-11-11T06:49:51.603Z",
+      "ms": 17,
+      "bytes": 307010,
+      "attempts": 1
+    },
+    {
+      "label": "DefiLlama holders revenue pendle",
+      "method": "GET",
+      "url": "https://api.llama.fi/summary/fees/pendle?dataType=dailyHoldersRevenue",
+      "status": 200,
+      "ok": true,
+      "error": null,
+      "fetchedAt": "2026-11-11T06:49:51.902Z",
+      "ms": 17,
+      "bytes": 293621,
+      "attempts": 1
+    },
+    {
+      "label": "DefiLlama protocol morpho",
+      "method": "GET",
+      "url": "https://api.llama.fi/protocol/morpho",
+      "status": 200,
+      "ok": true,
+      "error": null,
+      "fetchedAt": "2026-11-11T06:49:52.204Z",
+      "ms": 131,
+      "bytes": 14005306,
       "attempts": 1
     },
     {
@@ -705,9 +717,9 @@
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:52:54.498Z",
-      "ms": 976,
-      "bytes": 463689,
+      "fetchedAt": "2026-11-11T06:49:52.503Z",
+      "ms": 20,
+      "bytes": 464734,
       "attempts": 1
     },
     {
@@ -717,9 +729,9 @@
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:52:54.799Z",
-      "ms": 824,
-      "bytes": 429946,
+      "fetchedAt": "2026-11-11T06:49:52.803Z",
+      "ms": 16,
+      "bytes": 430825,
       "attempts": 1
     },
     {
@@ -729,9 +741,9 @@
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:52:55.780Z",
-      "ms": 34,
-      "bytes": 621544,
+      "fetchedAt": "2026-11-11T06:49:53.404Z",
+      "ms": 45,
+      "bytes": 622299,
       "attempts": 1
     },
     {
@@ -741,9 +753,9 @@
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:52:56.079Z",
-      "ms": 42,
-      "bytes": 73637,
+      "fetchedAt": "2026-11-11T06:49:53.703Z",
+      "ms": 15,
+      "bytes": 73704,
       "attempts": 1
     },
     {
@@ -753,9 +765,9 @@
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:52:55.480Z",
-      "ms": 815,
-      "bytes": 429946,
+      "fetchedAt": "2026-11-11T06:49:53.103Z",
+      "ms": 627,
+      "bytes": 430825,
       "attempts": 1
     },
     {
@@ -765,9 +777,9 @@
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:52:56.381Z",
-      "ms": 29,
-      "bytes": 72744,
+      "fetchedAt": "2026-11-11T06:49:54.004Z",
+      "ms": 14,
+      "bytes": 72813,
       "attempts": 1
     },
     {
@@ -777,8 +789,8 @@
       "status": 400,
       "ok": false,
       "error": "HTTP 400: Fees for ethena not found, please visit /overview/fees to see available protocols",
-      "fetchedAt": "2026-11-10T19:52:56.681Z",
-      "ms": 685,
+      "fetchedAt": "2026-11-11T06:49:54.303Z",
+      "ms": 17,
       "bytes": 81,
       "attempts": 1
     },
@@ -789,9 +801,9 @@
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:52:57.382Z",
-      "ms": 83,
-      "bytes": 4594076,
+      "fetchedAt": "2026-11-11T06:49:54.603Z",
+      "ms": 40,
+      "bytes": 4597398,
       "attempts": 1
     },
     {
@@ -801,9 +813,9 @@
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:52:57.682Z",
-      "ms": 952,
-      "bytes": 357584,
+      "fetchedAt": "2026-11-11T06:49:54.902Z",
+      "ms": 16,
+      "bytes": 357886,
       "attempts": 1
     },
     {
@@ -813,9 +825,9 @@
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:52:57.982Z",
-      "ms": 931,
-      "bytes": 342715,
+      "fetchedAt": "2026-11-11T06:49:55.203Z",
+      "ms": 19,
+      "bytes": 343012,
       "attempts": 1
     },
     {
@@ -825,21 +837,9 @@
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:52:58.637Z",
-      "ms": 802,
-      "bytes": 319327,
-      "attempts": 1
-    },
-    {
-      "label": "DefiLlama protocol morpho",
-      "method": "GET",
-      "url": "https://api.llama.fi/protocol/morpho",
-      "status": 200,
-      "ok": true,
-      "error": null,
-      "fetchedAt": "2026-11-10T19:52:54.197Z",
-      "ms": 5574,
-      "bytes": 13975588,
+      "fetchedAt": "2026-11-11T06:49:55.504Z",
+      "ms": 17,
+      "bytes": 319624,
       "attempts": 1
     },
     {
@@ -849,9 +849,9 @@
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:52:59.937Z",
-      "ms": 441,
-      "bytes": 32618,
+      "fetchedAt": "2026-11-11T06:49:55.544Z",
+      "ms": 442,
+      "bytes": 33730,
       "attempts": 1
     },
     {
@@ -861,9 +861,9 @@
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:53:06.940Z",
-      "ms": 167,
-      "bytes": 38286,
+      "fetchedAt": "2026-11-11T06:50:02.546Z",
+      "ms": 70,
+      "bytes": 38287,
       "attempts": 1
     },
     {
@@ -873,9 +873,9 @@
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:53:13.940Z",
-      "ms": 262,
-      "bytes": 37413,
+      "fetchedAt": "2026-11-11T06:50:09.545Z",
+      "ms": 1683,
+      "bytes": 37249,
       "attempts": 1
     },
     {
@@ -885,8 +885,8 @@
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:53:20.939Z",
-      "ms": 156,
+      "fetchedAt": "2026-11-11T06:50:16.546Z",
+      "ms": 60,
       "bytes": 37974,
       "attempts": 1
     },
@@ -897,9 +897,9 @@
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:53:27.939Z",
-      "ms": 246,
-      "bytes": 33331,
+      "fetchedAt": "2026-11-11T06:50:23.547Z",
+      "ms": 314,
+      "bytes": 33205,
       "attempts": 1
     },
     {
@@ -909,10 +909,10 @@
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:54:35.045Z",
-      "ms": 132,
-      "bytes": 38213,
-      "attempts": 2
+      "fetchedAt": "2026-11-11T06:50:30.547Z",
+      "ms": 91,
+      "bytes": 38217,
+      "attempts": 1
     },
     {
       "label": "CoinGecko coin centrifuge-2",
@@ -921,10 +921,10 @@
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:54:42.048Z",
-      "ms": 258,
-      "bytes": 33316,
-      "attempts": 1
+      "fetchedAt": "2026-11-11T06:51:37.591Z",
+      "ms": 225,
+      "bytes": 33183,
+      "attempts": 2
     },
     {
       "label": "CoinGecko 1y market chart centrifuge-2",
@@ -933,9 +933,9 @@
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:54:49.048Z",
-      "ms": 201,
-      "bytes": 38165,
+      "fetchedAt": "2026-11-11T06:51:44.593Z",
+      "ms": 103,
+      "bytes": 38168,
       "attempts": 1
     },
     {
@@ -945,9 +945,9 @@
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:54:56.048Z",
-      "ms": 101,
-      "bytes": 34399,
+      "fetchedAt": "2026-11-11T06:51:51.594Z",
+      "ms": 191,
+      "bytes": 34598,
       "attempts": 1
     },
     {
@@ -957,9 +957,9 @@
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:55:03.048Z",
-      "ms": 838,
-      "bytes": 38502,
+      "fetchedAt": "2026-11-11T06:51:58.594Z",
+      "ms": 132,
+      "bytes": 38503,
       "attempts": 1
     },
     {
@@ -969,9 +969,9 @@
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:55:10.047Z",
-      "ms": 288,
-      "bytes": 33038,
+      "fetchedAt": "2026-11-11T06:52:05.594Z",
+      "ms": 182,
+      "bytes": 33058,
       "attempts": 1
     },
     {
@@ -981,9 +981,9 @@
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:55:17.047Z",
-      "ms": 167,
-      "bytes": 37714,
+      "fetchedAt": "2026-11-11T06:52:12.594Z",
+      "ms": 86,
+      "bytes": 37716,
       "attempts": 1
     },
     {
@@ -993,10 +993,10 @@
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:56:24.147Z",
-      "ms": 214,
-      "bytes": 36045,
-      "attempts": 2
+      "fetchedAt": "2026-11-11T06:52:19.594Z",
+      "ms": 235,
+      "bytes": 35973,
+      "attempts": 1
     },
     {
       "label": "CoinGecko 1y market chart pendle",
@@ -1005,10 +1005,10 @@
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:56:31.150Z",
-      "ms": 144,
-      "bytes": 37879,
-      "attempts": 1
+      "fetchedAt": "2026-11-11T06:53:26.645Z",
+      "ms": 106,
+      "bytes": 37881,
+      "attempts": 2
     },
     {
       "label": "CoinGecko coin morpho",
@@ -1017,9 +1017,9 @@
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:56:38.149Z",
-      "ms": 304,
-      "bytes": 33733,
+      "fetchedAt": "2026-11-11T06:53:33.646Z",
+      "ms": 202,
+      "bytes": 33922,
       "attempts": 1
     },
     {
@@ -1029,9 +1029,9 @@
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:56:45.150Z",
-      "ms": 151,
-      "bytes": 37979,
+      "fetchedAt": "2026-11-11T06:53:40.648Z",
+      "ms": 142,
+      "bytes": 37978,
       "attempts": 1
     },
     {
@@ -1041,9 +1041,9 @@
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:56:52.149Z",
-      "ms": 201,
-      "bytes": 38391,
+      "fetchedAt": "2026-11-11T06:53:47.648Z",
+      "ms": 191,
+      "bytes": 37817,
       "attempts": 1
     },
     {
@@ -1053,10 +1053,10 @@
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:57:59.246Z",
-      "ms": 128,
-      "bytes": 38256,
-      "attempts": 2
+      "fetchedAt": "2026-11-11T06:53:54.647Z",
+      "ms": 146,
+      "bytes": 38260,
+      "attempts": 1
     },
     {
       "label": "CoinGecko coin compound-governance-token",
@@ -1065,9 +1065,9 @@
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:58:06.249Z",
+      "fetchedAt": "2026-11-11T06:54:01.647Z",
       "ms": 322,
-      "bytes": 35868,
+      "bytes": 35833,
       "attempts": 1
     },
     {
@@ -1077,10 +1077,10 @@
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:58:13.249Z",
-      "ms": 242,
-      "bytes": 37998,
-      "attempts": 1
+      "fetchedAt": "2026-11-11T06:55:08.710Z",
+      "ms": 200,
+      "bytes": 38001,
+      "attempts": 2
     },
     {
       "label": "DexScreener pairs ethereum",
@@ -1089,9 +1089,9 @@
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:58:13.493Z",
-      "ms": 237,
-      "bytes": 8471,
+      "fetchedAt": "2026-11-11T06:55:08.912Z",
+      "ms": 121,
+      "bytes": 8564,
       "attempts": 1
     },
     {
@@ -1101,9 +1101,9 @@
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:58:13.892Z",
-      "ms": 123,
-      "bytes": 4555,
+      "fetchedAt": "2026-11-11T06:55:09.311Z",
+      "ms": 53,
+      "bytes": 4576,
       "attempts": 1
     },
     {
@@ -1113,9 +1113,9 @@
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:58:14.293Z",
-      "ms": 84,
-      "bytes": 24609,
+      "fetchedAt": "2026-11-11T06:55:09.712Z",
+      "ms": 45,
+      "bytes": 24839,
       "attempts": 1
     },
     {
@@ -1125,9 +1125,9 @@
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:58:14.693Z",
-      "ms": 58,
-      "bytes": 11448,
+      "fetchedAt": "2026-11-11T06:55:10.112Z",
+      "ms": 67,
+      "bytes": 8775,
       "attempts": 1
     },
     {
@@ -1137,9 +1137,9 @@
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:58:15.094Z",
-      "ms": 171,
-      "bytes": 24470,
+      "fetchedAt": "2026-11-11T06:55:10.513Z",
+      "ms": 40,
+      "bytes": 21239,
       "attempts": 1
     },
     {
@@ -1149,9 +1149,9 @@
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:58:15.493Z",
-      "ms": 156,
-      "bytes": 22553,
+      "fetchedAt": "2026-11-11T06:55:10.912Z",
+      "ms": 93,
+      "bytes": 19404,
       "attempts": 1
     },
     {
@@ -1161,9 +1161,9 @@
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:58:15.893Z",
-      "ms": 151,
-      "bytes": 4096,
+      "fetchedAt": "2026-11-11T06:55:11.313Z",
+      "ms": 55,
+      "bytes": 2506,
       "attempts": 1
     },
     {
@@ -1173,9 +1173,9 @@
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:58:16.294Z",
-      "ms": 139,
-      "bytes": 15710,
+      "fetchedAt": "2026-11-11T06:55:11.713Z",
+      "ms": 42,
+      "bytes": 17349,
       "attempts": 1
     },
     {
@@ -1185,8 +1185,8 @@
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:58:16.433Z",
-      "ms": 152,
+      "fetchedAt": "2026-11-11T06:55:11.756Z",
+      "ms": 89,
       "bytes": 11196,
       "attempts": 1
     },
@@ -1197,8 +1197,8 @@
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:58:19.935Z",
-      "ms": 206,
+      "fetchedAt": "2026-11-11T06:55:15.258Z",
+      "ms": 312,
       "bytes": 10912,
       "attempts": 1
     },
@@ -1209,8 +1209,8 @@
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:58:23.435Z",
-      "ms": 72,
+      "fetchedAt": "2026-11-11T06:55:18.758Z",
+      "ms": 102,
       "bytes": 2725,
       "attempts": 1
     },
@@ -1221,8 +1221,8 @@
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:58:26.935Z",
-      "ms": 322,
+      "fetchedAt": "2026-11-11T06:55:22.259Z",
+      "ms": 108,
       "bytes": 25,
       "attempts": 1
     },
@@ -1233,9 +1233,9 @@
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:58:30.435Z",
-      "ms": 463,
-      "bytes": 5529,
+      "fetchedAt": "2026-11-11T06:55:25.758Z",
+      "ms": 149,
+      "bytes": 5566,
       "attempts": 1
     },
     {
@@ -1245,9 +1245,9 @@
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:58:30.898Z",
-      "ms": 167,
-      "bytes": 17560,
+      "fetchedAt": "2026-11-11T06:55:25.908Z",
+      "ms": 63,
+      "bytes": 19094,
       "attempts": 1
     },
     {
@@ -1257,8 +1257,8 @@
       "status": 429,
       "ok": false,
       "error": "HTTP 429: {\"status\":{\"error_code\":429,\"error_message\":\"You've exceeded the Rate Limit. Please visit https://www.coingecko.com/en/api/pricing to subscribe to our API plans",
-      "fetchedAt": "2026-11-10T19:58:40.934Z",
-      "ms": 19,
+      "fetchedAt": "2026-11-11T06:55:36.259Z",
+      "ms": 11,
       "bytes": 272,
       "attempts": 3
     },
@@ -1269,9 +1269,9 @@
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:58:40.953Z",
-      "ms": 88,
-      "bytes": 759,
+      "fetchedAt": "2026-11-11T06:55:36.270Z",
+      "ms": 78,
+      "bytes": 745,
       "attempts": 1
     },
     {
@@ -1281,9 +1281,9 @@
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:58:41.352Z",
-      "ms": 128,
-      "bytes": 9026,
+      "fetchedAt": "2026-11-11T06:55:36.670Z",
+      "ms": 52,
+      "bytes": 9724,
       "attempts": 1
     },
     {
@@ -1293,9 +1293,9 @@
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:58:41.753Z",
-      "ms": 24,
-      "bytes": 30688,
+      "fetchedAt": "2026-11-11T06:55:37.071Z",
+      "ms": 56,
+      "bytes": 32727,
       "attempts": 1
     },
     {
@@ -1305,8 +1305,8 @@
       "status": 429,
       "ok": false,
       "error": "HTTP 429: {\"status\":{\"error_code\":429,\"error_message\":\"You've exceeded the Rate Limit. Please visit https://www.coingecko.com/en/api/pricing to subscribe to our API plans",
-      "fetchedAt": "2026-11-10T19:58:51.435Z",
-      "ms": 19,
+      "fetchedAt": "2026-11-11T06:55:46.759Z",
+      "ms": 13,
       "bytes": 272,
       "attempts": 3
     },
@@ -1317,9 +1317,9 @@
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:58:51.455Z",
-      "ms": 233,
-      "bytes": 22771,
+      "fetchedAt": "2026-11-11T06:55:46.772Z",
+      "ms": 67,
+      "bytes": 22111,
       "attempts": 1
     },
     {
@@ -1329,21 +1329,21 @@
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:58:51.854Z",
-      "ms": 155,
-      "bytes": 1464,
+      "fetchedAt": "2026-11-11T06:55:47.172Z",
+      "ms": 55,
+      "bytes": 1458,
       "attempts": 1
     },
     {
       "label": "GeckoTerminal pools metis-andromeda",
       "method": "GET",
       "url": "https://api.geckoterminal.com/api/v2/networks/metis/tokens/0x58538e6a46e07434d7e7375bc268d3cb839c0133/pools?include=dex&page=1",
-      "status": 200,
-      "ok": true,
-      "error": null,
-      "fetchedAt": "2026-11-10T19:59:01.936Z",
-      "ms": 373,
-      "bytes": 25,
+      "status": 429,
+      "ok": false,
+      "error": "HTTP 429: {\"status\":{\"error_code\":429,\"error_message\":\"You've exceeded the Rate Limit. Please visit https://www.coingecko.com/en/api/pricing to subscribe to our API plans",
+      "fetchedAt": "2026-11-11T06:55:57.258Z",
+      "ms": 12,
+      "bytes": 272,
       "attempts": 3
     },
     {
@@ -1353,22 +1353,23 @@
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:59:02.310Z",
-      "ms": 164,
-      "bytes": 17070,
+      "fetchedAt": "2026-11-11T06:55:57.271Z",
+      "ms": 56,
+      "bytes": 21924,
       "attempts": 1
     },
     {
       "label": "GeckoTerminal pools near-protocol",
       "method": "GET",
       "url": "https://api.geckoterminal.com/api/v2/networks/near/tokens/c00e94cb662c3520282e6f5717214004a7f26888.factory.bridge.near/pools?include=dex&page=1",
-      "status": 429,
+      "status": 0,
       "ok": false,
-      "error": "HTTP 429: {\"status\":{\"error_code\":429,\"error_message\":\"You've exceeded the Rate Limit. Please visit https://www.coingecko.com/en/api/pricing to subscribe to our API plans",
-      "fetchedAt": "2026-11-10T19:59:12.434Z",
-      "ms": 23,
-      "bytes": 272,
-      "attempts": 3
+      "error": "Skipped: api.geckoterminal.com kept answering HTTP 429 (rate limited) earlier in this run",
+      "fetchedAt": "2026-11-11T06:55:57.327Z",
+      "ms": 0,
+      "bytes": 0,
+      "attempts": 0,
+      "skipped": true
     },
     {
       "label": "DexScreener pairs base",
@@ -1377,9 +1378,9 @@
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:59:12.457Z",
-      "ms": 129,
-      "bytes": 6189,
+      "fetchedAt": "2026-11-11T06:55:57.672Z",
+      "ms": 77,
+      "bytes": 6172,
       "attempts": 1
     },
     {
@@ -1389,9 +1390,9 @@
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:59:12.587Z",
-      "ms": 279,
-      "bytes": 8780,
+      "fetchedAt": "2026-11-11T06:55:57.751Z",
+      "ms": 770,
+      "bytes": 8779,
       "attempts": 1
     },
     {
@@ -1401,9 +1402,9 @@
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:59:14.089Z",
-      "ms": 122,
-      "bytes": 15756,
+      "fetchedAt": "2026-11-11T06:55:59.251Z",
+      "ms": 77,
+      "bytes": 15755,
       "attempts": 1
     },
     {
@@ -1413,8 +1414,8 @@
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:59:14.213Z",
-      "ms": 731,
+      "fetchedAt": "2026-11-11T06:55:59.330Z",
+      "ms": 549,
       "bytes": 144600,
       "attempts": 1
     },
@@ -1425,9 +1426,9 @@
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:59:14.212Z",
-      "ms": 746,
-      "bytes": 89398,
+      "fetchedAt": "2026-11-11T06:55:59.329Z",
+      "ms": 703,
+      "bytes": 91420,
       "attempts": 1
     },
     {
@@ -1437,8 +1438,8 @@
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:59:14.960Z",
-      "ms": 283,
+      "fetchedAt": "2026-11-11T06:56:00.035Z",
+      "ms": 113,
       "bytes": 52234,
       "attempts": 1
     },
@@ -1449,9 +1450,9 @@
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:59:14.214Z",
-      "ms": 1191,
-      "bytes": 130010,
+      "fetchedAt": "2026-11-11T06:55:59.331Z",
+      "ms": 894,
+      "bytes": 130011,
       "attempts": 1
     },
     {
@@ -1461,21 +1462,9 @@
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:59:15.245Z",
-      "ms": 319,
+      "fetchedAt": "2026-11-11T06:56:00.150Z",
+      "ms": 139,
       "bytes": 99962,
-      "attempts": 1
-    },
-    {
-      "label": "Feed: Aave governance forum",
-      "method": "GET",
-      "url": "https://governance.aave.com/latest.rss",
-      "status": 200,
-      "ok": true,
-      "error": null,
-      "fetchedAt": "2026-11-10T19:59:14.213Z",
-      "ms": 1364,
-      "bytes": 440957,
       "attempts": 1
     },
     {
@@ -1485,33 +1474,9 @@
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:59:15.567Z",
-      "ms": 123,
-      "bytes": 31592,
-      "attempts": 1
-    },
-    {
-      "label": "Feed: Decrypt",
-      "method": "GET",
-      "url": "https://decrypt.co/feed",
-      "status": 200,
-      "ok": true,
-      "error": null,
-      "fetchedAt": "2026-11-10T19:59:15.582Z",
-      "ms": 135,
-      "bytes": 42939,
-      "attempts": 1
-    },
-    {
-      "label": "Feed: Cointelegraph",
-      "method": "GET",
-      "url": "https://cointelegraph.com/rss",
-      "status": 200,
-      "ok": true,
-      "error": null,
-      "fetchedAt": "2026-11-10T19:59:15.691Z",
-      "ms": 95,
-      "bytes": 52555,
+      "fetchedAt": "2026-11-11T06:56:00.293Z",
+      "ms": 44,
+      "bytes": 29987,
       "attempts": 1
     },
     {
@@ -1521,21 +1486,45 @@
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:59:15.408Z",
-      "ms": 472,
-      "bytes": 30729,
+      "fetchedAt": "2026-11-11T06:56:00.228Z",
+      "ms": 140,
+      "bytes": 31191,
       "attempts": 1
     },
     {
-      "label": "Feed: The Defiant",
+      "label": "Feed: Decrypt",
       "method": "GET",
-      "url": "https://thedefiant.io/feed",
+      "url": "https://decrypt.co/feed",
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:59:15.881Z",
-      "ms": 241,
-      "bytes": 142220,
+      "fetchedAt": "2026-11-11T06:56:00.338Z",
+      "ms": 49,
+      "bytes": 42935,
+      "attempts": 1
+    },
+    {
+      "label": "Feed: Cointelegraph",
+      "method": "GET",
+      "url": "https://cointelegraph.com/rss",
+      "status": 200,
+      "ok": true,
+      "error": null,
+      "fetchedAt": "2026-11-11T06:56:00.370Z",
+      "ms": 68,
+      "bytes": 52656,
+      "attempts": 1
+    },
+    {
+      "label": "Feed: Aave governance forum",
+      "method": "GET",
+      "url": "https://governance.aave.com/latest.rss",
+      "status": 200,
+      "ok": true,
+      "error": null,
+      "fetchedAt": "2026-11-11T06:55:59.330Z",
+      "ms": 1146,
+      "bytes": 440959,
       "attempts": 1
     },
     {
@@ -1545,9 +1534,21 @@
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:59:15.786Z",
-      "ms": 372,
+      "fetchedAt": "2026-11-11T06:56:00.440Z",
+      "ms": 113,
       "bytes": 268090,
+      "attempts": 1
+    },
+    {
+      "label": "Feed: The Defiant",
+      "method": "GET",
+      "url": "https://thedefiant.io/feed",
+      "status": 200,
+      "ok": true,
+      "error": null,
+      "fetchedAt": "2026-11-11T06:56:00.484Z",
+      "ms": 121,
+      "bytes": 142220,
       "attempts": 1
     },
     {
@@ -1557,8 +1558,8 @@
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:59:15.718Z",
-      "ms": 923,
+      "fetchedAt": "2026-11-11T06:56:00.388Z",
+      "ms": 378,
       "bytes": 56158,
       "attempts": 1
     },
@@ -1569,9 +1570,9 @@
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:59:14.948Z",
-      "ms": 2804,
-      "bytes": 759258,
+      "fetchedAt": "2026-11-11T06:55:59.884Z",
+      "ms": 1485,
+      "bytes": 694415,
       "attempts": 1
     },
     {
@@ -1581,9 +1582,9 @@
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:59:17.974Z",
-      "ms": 111,
-      "bytes": 237723,
+      "fetchedAt": "2026-11-11T06:56:01.520Z",
+      "ms": 109,
+      "bytes": 237689,
       "attempts": 1
     },
     {
@@ -1593,9 +1594,9 @@
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:59:24.976Z",
-      "ms": 349,
-      "bytes": 236569,
+      "fetchedAt": "2026-11-11T06:56:08.523Z",
+      "ms": 480,
+      "bytes": 236338,
       "attempts": 1
     },
     {
@@ -1605,129 +1606,129 @@
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:59:25.328Z",
-      "ms": 700,
-      "bytes": 2455721,
+      "fetchedAt": "2026-11-11T06:56:09.006Z",
+      "ms": 273,
+      "bytes": 2430751,
       "attempts": 1
     },
     {
       "label": "DefiLlama weekly price history syrup",
       "method": "GET",
-      "url": "https://coins.llama.fi/chart/coingecko:syrup?start=1636660766&span=262&period=1w",
+      "url": "https://coins.llama.fi/chart/coingecko:syrup?start=1636700169&span=262&period=1w",
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:59:26.047Z",
-      "ms": 582,
-      "bytes": 5072,
+      "fetchedAt": "2026-11-11T06:56:09.300Z",
+      "ms": 510,
+      "bytes": 5077,
       "attempts": 1
     },
     {
       "label": "DefiLlama weekly price history aave",
       "method": "GET",
-      "url": "https://coins.llama.fi/chart/coingecko:aave?start=1636660766&span=262&period=1w",
+      "url": "https://coins.llama.fi/chart/coingecko:aave?start=1636700169&span=262&period=1w",
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:59:26.632Z",
-      "ms": 1428,
-      "bytes": 11897,
+      "fetchedAt": "2026-11-11T06:56:09.813Z",
+      "ms": 858,
+      "bytes": 12178,
       "attempts": 1
     },
     {
       "label": "DefiLlama weekly price history ondo-finance",
       "method": "GET",
-      "url": "https://coins.llama.fi/chart/coingecko:ondo-finance?start=1636660768&span=262&period=1w",
+      "url": "https://coins.llama.fi/chart/coingecko:ondo-finance?start=1636700170&span=262&period=1w",
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:59:28.063Z",
-      "ms": 1077,
-      "bytes": 6840,
+      "fetchedAt": "2026-11-11T06:56:10.673Z",
+      "ms": 617,
+      "bytes": 7068,
       "attempts": 1
     },
     {
       "label": "DefiLlama weekly price history centrifuge-2",
       "method": "GET",
-      "url": "https://coins.llama.fi/chart/coingecko:centrifuge-2?start=1636660769&span=262&period=1w",
+      "url": "https://coins.llama.fi/chart/coingecko:centrifuge-2?start=1636700171&span=262&period=1w",
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:59:29.142Z",
-      "ms": 860,
-      "bytes": 3933,
+      "fetchedAt": "2026-11-11T06:56:11.291Z",
+      "ms": 357,
+      "bytes": 3928,
       "attempts": 1
     },
     {
       "label": "DefiLlama weekly price history sky",
       "method": "GET",
-      "url": "https://coins.llama.fi/chart/coingecko:sky?start=1636660770&span=262&period=1w",
+      "url": "https://coins.llama.fi/chart/coingecko:sky?start=1636700171&span=262&period=1w",
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:59:30.003Z",
-      "ms": 851,
-      "bytes": 5335,
+      "fetchedAt": "2026-11-11T06:56:11.649Z",
+      "ms": 357,
+      "bytes": 5338,
       "attempts": 1
     },
     {
       "label": "DefiLlama weekly price history hyperliquid",
       "method": "GET",
-      "url": "https://coins.llama.fi/chart/coingecko:hyperliquid?start=1636660770&span=262&period=1w",
+      "url": "https://coins.llama.fi/chart/coingecko:hyperliquid?start=1636700172&span=262&period=1w",
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:59:30.856Z",
-      "ms": 560,
-      "bytes": 4774,
+      "fetchedAt": "2026-11-11T06:56:12.007Z",
+      "ms": 522,
+      "bytes": 4933,
       "attempts": 1
     },
     {
       "label": "DefiLlama weekly price history pendle",
       "method": "GET",
-      "url": "https://coins.llama.fi/chart/coingecko:pendle?start=1636660771&span=262&period=1w",
+      "url": "https://coins.llama.fi/chart/coingecko:pendle?start=1636700172&span=262&period=1w",
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:59:31.417Z",
-      "ms": 662,
-      "bytes": 11889,
+      "fetchedAt": "2026-11-11T06:56:12.530Z",
+      "ms": 658,
+      "bytes": 12239,
       "attempts": 1
     },
     {
       "label": "DefiLlama weekly price history morpho",
       "method": "GET",
-      "url": "https://coins.llama.fi/chart/coingecko:morpho?start=1636660772&span=262&period=1w",
+      "url": "https://coins.llama.fi/chart/coingecko:morpho?start=1636700173&span=262&period=1w",
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:59:32.080Z",
-      "ms": 859,
-      "bytes": 4872,
+      "fetchedAt": "2026-11-11T06:56:13.189Z",
+      "ms": 357,
+      "bytes": 4883,
       "attempts": 1
     },
     {
       "label": "DefiLlama weekly price history ethena",
       "method": "GET",
-      "url": "https://coins.llama.fi/chart/coingecko:ethena?start=1636660772&span=262&period=1w",
+      "url": "https://coins.llama.fi/chart/coingecko:ethena?start=1636700173&span=262&period=1w",
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:59:32.940Z",
-      "ms": 1068,
-      "bytes": 6492,
+      "fetchedAt": "2026-11-11T06:56:13.547Z",
+      "ms": 549,
+      "bytes": 6602,
       "attempts": 1
     },
     {
       "label": "DefiLlama weekly price history compound-governance-token",
       "method": "GET",
-      "url": "https://coins.llama.fi/chart/coingecko:compound-governance-token?start=1636660774&span=262&period=1w",
+      "url": "https://coins.llama.fi/chart/coingecko:compound-governance-token?start=1636700174&span=262&period=1w",
       "status": 200,
       "ok": true,
       "error": null,
-      "fetchedAt": "2026-11-10T19:59:34.009Z",
-      "ms": 1112,
-      "bytes": 11866,
+      "fetchedAt": "2026-11-11T06:56:14.097Z",
+      "ms": 596,
+      "bytes": 12106,
       "attempts": 1
     }
   ]
