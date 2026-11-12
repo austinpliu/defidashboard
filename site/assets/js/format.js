@@ -18,6 +18,17 @@ export function usd(v, { digits } = {}) {
   return `${sign}$${Number(a.toPrecision(4))}`;
 }
 
+/** A token price: cents are kept up to $1,000 ($114.25, not $114), four significant digits under $1. */
+export function usdPrice(v) {
+  if (!isNum(v)) return '—';
+  const a = Math.abs(v);
+  const sign = v < 0 ? '−' : '';
+  if (a >= 1000) return `${sign}$${a.toLocaleString('en-US', { maximumFractionDigits: 0 })}`;
+  if (a >= 1) return `${sign}$${a.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  if (a === 0) return '$0';
+  return `${sign}$${Number(a.toPrecision(4))}`;
+}
+
 /** Full-precision dollars for tables/tooltips: $1,234,567 */
 export function usdFull(v) {
   if (!isNum(v)) return '—';

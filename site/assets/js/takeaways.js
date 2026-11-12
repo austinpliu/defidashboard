@@ -250,3 +250,59 @@ export function catalystTakeaway(items, now = Date.now()) {
   if (recent.length) return { pre: '', hl: `${recent.length} items`, post: ' about your watchlist in the past week' };
   return null;
 }
+
+// ---------- Tokens page ----------
+
+const joinNames = (names) => (names.length <= 1 ? names.join('') : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`);
+
+/**
+ * Price moves across tracked tokens over one period. rows: [{ symbol, change }] (change in %).
+ * Says who rose most and who fell most, and never calls the smallest loser the biggest one:
+ * when every token fell (or rose) the headline says so first. Ties are named together.
+ */
+export function priceMovesTakeaway(rows, period = 'the past 7 days') {
+  const ok = (rows || []).filter((r) => isNum(r.change)).sort((a, b) => b.change - a.change);
+  if (ok.length < 2) return null;
+  const best = ok.filter((r) => r.change === ok[0].change);
+  const worst = ok.filter((r) => r.change === ok[ok.length - 1].change);
+  const bestNames = joinNames(best.map((r) => r.symbol));
+  const worstNames = joinNames(worst.map((r) => r.symbol));
+  const hi = ok[0].change;
+  const lo = ok[ok.length - 1].change;
+  const ups = ok.filter((r) => r.change > 0).length;
+  const downs = ok.filter((r) => r.change < 0).length;
+  const n = ok.length;
+  if (hi === lo) return hi === 0 ? null : { pre: `All ${n} tracked tokens `, hl: `${hi > 0 ? 'rose' : 'fell'} ${pct(Math.abs(hi), { signed: false })}`, post: ` over ${period}` };
+  if (ups === 0 && downs > 0) {
+    return { pre: `${downs === n ? `All ${n} tracked tokens fell` : 'No tracked token rose'} over ${period}; `, hl: `${worstNames} fell most (${pct(lo)})`, post: hi < 0 ? `, ${bestNames} least (${pct(hi)})` : '' };
+  }
+  if (downs === 0 && ups > 0) {
+    return { pre: `${ups === n ? `All ${n} tracked tokens rose` : 'No tracked token fell'} over ${period}; `, hl: `${bestNames} rose most (${pct(hi)})`, post: lo > 0 ? `, ${worstNames} least (${pct(lo)})` : '' };
+  }
+  return { pre: `${bestNames} `, hl: `rose most over ${period} (${pct(hi)})`, post: `; ${worstNames} fell most (${pct(lo)}). ${ups} of ${n} tracked tokens rose` };
+}
+
+/**
+ * Which tracked token is valued lowest and highest against a year of revenue.
+ * rows: [{ symbol, multiple, revenue30d }] where multiple = value ÷ annualized revenue (null when
+ * there is no revenue or no data). basisLabel: 'Market cap' or 'FDV'.
+ * Tokens without revenue are counted, not ranked: a multiple of nothing is not "cheap".
+ */
+export function tokenValuationTakeaway(rows, { basisLabel = 'Market cap' } = {}) {
+  const all = rows || [];
+  const valid = all.filter((r) => isNum(r.multiple) && r.multiple > 0).sort((a, b) => a.multiple - b.multiple);
+  const zero = all.filter((r) => r.revenue30d === 0).length;
+  const tail = zero ? `. ${zero} of the ${all.length} record no protocol revenue, so they have no multiple` : '';
+  if (valid.length >= 2) {
+    const low = valid[0];
+    const high = valid[valid.length - 1];
+    if (ratio(low.multiple) === ratio(valid[1].multiple)) {
+      return { pre: `${low.symbol} and ${valid[1].symbol} share `, hl: `the lowest ${basisLabel.toLowerCase()} ÷ revenue (${ratio(low.multiple)})`, post: ` of the ${valid.length} tracked tokens with revenue${tail}` };
+    }
+    return { pre: `${low.symbol} has `, hl: `the lowest ${basisLabel.toLowerCase()} ÷ revenue (${ratio(low.multiple)})`, post: ` of the ${valid.length} tracked tokens with revenue; ${high.symbol} the highest (${ratio(high.multiple)})${tail}` };
+  }
+  if (valid.length === 1) {
+    return { pre: `${valid[0].symbol} is `, hl: 'the only tracked token with a revenue multiple', post: ` (${basisLabel.toLowerCase()} ÷ annualized revenue: ${ratio(valid[0].multiple)})${tail}` };
+  }
+  return null;
+}

@@ -4,7 +4,7 @@ import { chartCard, infoCard } from '../cards.js';
 import { loadMany } from '../data.js';
 import { lineChart, hbarChart, themeOf } from '../charts.js';
 import { dataTable } from '../table.js';
-import { usd, usdFull, pct, ratio, date, dateTime, relative, shortDate, compact, monthYear } from '../format.js';
+import { usd, usdPrice, usdFull, pct, ratio, date, dateTime, relative, shortDate, compact, monthYear } from '../format.js';
 import { trimDays, rollingSum, RANGES, rangeLabel, changeOver } from '../series.js';
 import {
   trendTakeaway, protocolChainTakeaway, revenueTakeaway, priceTakeaway, valuationTakeaway, supplyTakeaway, yieldTakeaway,
@@ -77,7 +77,7 @@ export async function render(root, { params }) {
     statTile({ label: 'TVL', termKey: 'tvl', raw: T.value, value: usd(T.value), deltas: [{ v: T.change7d, per: '7d' }, { v: T.change30d, per: '30d' }], src: S[T.src], unavailableReason: T.unavailable }),
     statTile({ label: 'Fees, 30 days', termKey: 'fees', raw: F.total30d, value: usd(F.total30d), deltas: [{ v: F.change30dOver30d, per: F.changesCalculated ? 'vs prior 30d (calc.)' : 'vs prior 30d' }], src: S[F.src], unavailableReason: F.unavailable }),
     statTile({ label: 'Revenue, 30 days', termKey: 'revenue', raw: R.total30d, value: usd(R.total30d), deltas: [{ v: R.change30dOver30d, per: R.changesCalculated ? 'vs prior 30d (calc.)' : 'vs prior 30d' }], src: S[R.src], unavailableReason: R.unavailable }),
-    statTile({ label: sym ? `${sym} price` : 'Token price', termKey: 'price', raw: mk.price, value: usd(mk.price), deltas: [{ v: mk.change24h, per: '24h' }, { v: mk.change7d, per: '7d' }], src: tokenSrc, unavailableReason: tk.unavailable || mk.partial }),
+    statTile({ label: sym ? `${sym} price` : 'Token price', termKey: 'price', raw: mk.price, value: usdPrice(mk.price), deltas: [{ v: mk.change24h, per: '24h' }, { v: mk.change7d, per: '7d' }], src: tokenSrc, unavailableReason: tk.unavailable || mk.partial }),
     statTile({ label: 'Market cap', termKey: 'marketCap', raw: mk.marketCap, value: usd(mk.marketCap), note: mk.fdv ? `FDV ${usd(mk.fdv)}` : null, src: tokenSrc, unavailableReason: tk.unavailable || mk.partial || 'CoinGecko reports no market cap for this token' }),
     statTile({ label: 'Mcap ÷ annual fees', termKey: 'mcapToFees', raw: D.mcapToFees?.value, value: ratio(D.mcapToFees?.value), note: D.annualizedFees?.value ? `Annualized fees ${usd(D.annualizedFees.value)}` : null, src: S['calc-mcap-fees'], sources: S, unavailableReason: 'Needs both a market cap and 30-day fees' }),
   );
@@ -192,17 +192,26 @@ export async function render(root, { params }) {
   const idx = files['index.json'].data;
   const others = (idx?.protocols || []).filter((p) => p.slug !== slug && p.mcap && p.fees30d).map((p) => ({ name: p.name, value: p.mcap / ((p.fees30d * 365) / 30) }));
   const sup = tk.supply || {};
+  const HR = d.holdersRevenue || {};
+  const pctOrDash = (x) => (x?.value != null ? pct(x.value, { signed: false }) : '—');
+  // a multiple of zero revenue isn't a number: say so instead of leaving an unexplained dash
+  const mult = (x, total30, what) => (x?.value != null ? ratio(x.value) : total30 === 0 ? `no ${what}` : '—');
   const valRows = [
     ['Market cap', 'marketCap', usd(mk.marketCap), tokenSrc],
     ['Fully diluted value', 'fdv', usd(mk.fdv), tokenSrc],
+    ['Market cap as % of FDV', 'mcapToFdv', pctOrDash(D.mcapToFdv), S['calc-mcap-fdv']],
     ['Annualized fees', 'annualizedFees', usd(D.annualizedFees?.value), S['calc-annual-fees']],
     ['Annualized revenue', 'annualizedRevenue', usd(D.annualizedRevenue?.value), S['calc-annual-revenue']],
-    ['Market cap ÷ annualized fees', 'mcapToFees', ratio(D.mcapToFees?.value), S['calc-mcap-fees']],
-    ['Market cap ÷ annualized revenue', 'mcapToRevenue', ratio(D.mcapToRevenue?.value), S['calc-mcap-revenue']],
-    ['FDV ÷ annualized fees', 'fdvToFees', ratio(D.fdvToFees?.value), S['calc-fdv-fees']],
+    ['Annualized holders revenue', 'holdersRevenue', HR.unavailable ? '—' : usd(D.annualizedHoldersRevenue?.value), S['calc-annual-holders']],
+    ['Revenue as % of fees', 'revenueShare', pctOrDash(D.revenueShare), S['calc-revenue-share']],
+    ['Holders revenue as % of revenue', 'holdersShare', pctOrDash(D.holdersShare), S['calc-holders-share']],
+    ['Market cap ÷ annualized fees', 'mcapToFees', mult(D.mcapToFees, F.total30d, 'fees'), S['calc-mcap-fees']],
+    ['Market cap ÷ annualized revenue', 'mcapToRevenue', mult(D.mcapToRevenue, R.total30d, 'revenue'), S['calc-mcap-revenue']],
+    ['Market cap ÷ annualized holders revenue', 'mcapToHoldersRevenue', mult(D.mcapToHoldersRevenue, HR.total30d, 'holders revenue'), S['calc-mcap-holders']],
+    ['FDV ÷ annualized fees', 'fdvToFees', mult(D.fdvToFees, F.total30d, 'fees'), S['calc-fdv-fees']],
+    ['FDV ÷ annualized revenue', 'fdvToRevenue', mult(D.fdvToRevenue, R.total30d, 'revenue'), S['calc-fdv-revenue']],
     ['Market cap ÷ TVL', 'mcapToTvl', ratio(D.mcapToTvl?.value), S['calc-mcap-tvl']],
-    ['Revenue as % of fees', 'revenueShare', D.revenueShare?.value != null ? pct(D.revenueShare.value, { signed: false }) : '—', S['calc-revenue-share']],
-  ];
+  ].filter(([, , , src]) => src); // rows whose formula isn't in this data file yet are left out
   const valTable = h('div', { class: 'table-wrap' }, h('table', { class: 'data' },
     h('thead', {}, h('tr', {}, h('th', {}, 'Metric'), h('th', { class: 'n' }, 'Value'), h('th', {}, 'How'))),
     h('tbody', {}, valRows.map(([label, key, val, src]) => h('tr', {}, h('td', {}, term(label, key)), h('td', { class: 'n' }, val), h('td', { class: 'sub wrap' }, src?.derived ? src.formula : src ? extLink(src.page, src.name) : '—'))))));
@@ -230,7 +239,7 @@ export async function render(root, { params }) {
         ? h('div', { style: { marginTop: '12px' } }, h('p', { class: 'chart-title' }, term('Upcoming unlocks', 'unlock')), unlocksBlock(unl, sym || name, { maxEvents: 4 }))
         : h('div', { style: { marginTop: '12px' } }, unavailable('Upcoming unlocks: unavailable', unl.unavailable || 'No unlock schedule in the data.')),
     ],
-    src: [tokenSrc, S['dl-fees']].filter(Boolean),
+    src: [tokenSrc, S['dl-fees'], S['dl-revenue'], S['dl-holders-revenue']].filter(Boolean),
     sources: S,
   })));
 

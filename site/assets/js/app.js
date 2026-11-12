@@ -3,7 +3,7 @@ import { h, append, svgIcon, initTooltips, pageError, setBrokenLinks } from './u
 import { loadSafe } from './data.js';
 import { disposeAll, rethemeAll } from './charts.js';
 import { mountPending, clearPending } from './cards.js';
-import { usd, pct, relative, dateTime, direction } from './format.js';
+import { usd, usdPrice, pct, relative, dateTime, direction } from './format.js';
 import { parseHash } from './route.js';
 import * as home from './pages/home.js';
 import * as protocols from './pages/protocols.js';
@@ -113,7 +113,7 @@ async function setupTicker() {
   const items = index.protocols.filter((p) => p.price != null);
   if (!items.length) { el.hidden = true; return; }
   const row = () => items.map((p) => h('a', { class: 'ticker-item', href: p.tokenId ? `#/token/${p.tokenId}` : `#/protocol/${p.slug}` },
-    h('b', {}, p.symbol || p.name), h('span', { class: 'num' }, usd(p.price)),
+    h('b', {}, p.symbol || p.name), h('span', { class: 'num' }, usdPrice(p.price)),
     h('span', { class: `chg delta ${direction(p.priceChange24h)}` }, `${direction(p.priceChange24h) === 'up' ? '▲' : direction(p.priceChange24h) === 'down' ? '▼' : '■'} ${pct(p.priceChange24h)}`),
     h('span', { class: 'muted' }, 'TVL ', usd(p.tvl))));
   const track = h('div', { class: 'ticker-track' }, row(), row().map((n) => { n.setAttribute('aria-hidden', 'true'); n.tabIndex = -1; return n; }));

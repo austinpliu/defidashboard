@@ -4,7 +4,7 @@ import { chartCard, infoCard } from '../cards.js';
 import { loadMany } from '../data.js';
 import { lineChart, hbarChart, columnChart } from '../charts.js';
 import { dataTable } from '../table.js';
-import { usd, pct, ratio, date, dateTime, compact } from '../format.js';
+import { usd, usdPrice, pct, ratio, date, dateTime, compact } from '../format.js';
 import { trimDays, rangeLabel } from '../series.js';
 import { priceTakeaway, supplyTakeaway, liquidityTakeaway, trendTakeaway } from '../takeaways.js';
 import { unlocksBlock, unlockTakeaway } from '../unlocks.js';
@@ -40,11 +40,11 @@ export async function render(root, { params }) {
 
   const volMcap = mk.volume24h && mk.marketCap ? (mk.volume24h / mk.marketCap) * 100 : null;
   root.append(h('div', { class: 'stats six' },
-    statTile({ label: 'Price', termKey: 'price', raw: mk.price, value: usd(mk.price), deltas: [{ v: mk.change24h, per: '24h' }, { v: mk.change7d, per: '7d' }, { v: mk.change30d, per: '30d' }], src: msrc }),
+    statTile({ label: 'Price', termKey: 'price', raw: mk.price, value: usdPrice(mk.price), deltas: [{ v: mk.change24h, per: '24h' }, { v: mk.change7d, per: '7d' }, { v: mk.change30d, per: '30d' }], src: msrc }),
     statTile({ label: 'Market cap', termKey: 'marketCap', raw: mk.marketCap, value: usd(mk.marketCap), note: mk.rank ? `Rank #${mk.rank}` : null, src: msrc, unavailableReason: mk.partial }),
     statTile({ label: 'Fully diluted value', termKey: 'fdv', raw: mk.fdv, value: usd(mk.fdv), note: mk.marketCap && mk.fdv ? `Market cap is ${pct((mk.marketCap / mk.fdv) * 100, { signed: false, digits: 0 })} of FDV` : null, src: msrc, unavailableReason: mk.partial }),
     statTile({ label: '24h volume', termKey: 'volume24h', raw: mk.volume24h, value: usd(mk.volume24h), note: volMcap != null ? `${pct(volMcap, { signed: false })} of market cap traded` : null, src: msrc, unavailableReason: mk.partial }),
-    statTile({ label: 'All-time high', termKey: 'ath', raw: mk.ath, value: usd(mk.ath), deltas: [{ v: mk.athChange, per: 'from ATH' }], note: mk.athDate ? date(mk.athDate) : null, src: msrc, unavailableReason: mk.partial }),
+    statTile({ label: 'All-time high', termKey: 'ath', raw: mk.ath, value: usdPrice(mk.ath), deltas: [{ v: mk.athChange, per: 'from ATH' }], note: mk.athDate ? date(mk.athDate) : null, src: msrc, unavailableReason: mk.partial }),
     statTile({ label: 'DEX liquidity', termKey: 'liquidity', raw: t.dex?.totalLiquidity || null, value: usd(t.dex?.totalLiquidity), note: t.dex?.pools?.length ? `${t.dex.pools.length} largest pools` : null, unavailableReason: t.dex?.pools?.length && !t.dex.totalLiquidity ? `The DEX data source reports no liquidity for these markets (24h DEX volume: ${usd(t.dex.totalVolume24h)}).` : t.dex?.unavailable, src: (() => { const dexSrcs = Object.entries(S).filter(([k]) => k.startsWith('gt-') || k.startsWith('ds-')).map(([, v]) => v); return dexSrcs.find((x) => x.ok) || dexSrcs[0]; })() }),
   ));
 

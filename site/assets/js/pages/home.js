@@ -3,7 +3,7 @@ import { h, openExternal, append, band, statTile, sparkline, sourceLine, subhead
 import { chartCard, infoCard } from '../cards.js';
 import { loadMany } from '../data.js';
 import { lineChart, hbarChart, divergingChart, columnChart, stackedColumns, themeOf } from '../charts.js';
-import { usd, pct, dateTime, date, relative, shortDate, compact, monthYear } from '../format.js';
+import { usd, usdPrice, pct, dateTime, date, relative, shortDate, compact, monthYear } from '../format.js';
 import { trimDays, indexTo100, weeklySum, monthlyLast, valueAt, RANGES, rangeLabel, changeOver } from '../series.js';
 import {
   trendTakeaway, chainTakeaway, leaderTakeaway, stablecoinTakeaway, moversTakeaway, flowTakeaway, categoryTakeaway, compareTakeaway, catalystTakeaway,
@@ -106,7 +106,7 @@ export async function render(root) {
       h('div', { class: 'w-rows' },
         h('span', {}, 'TVL'), h('span', { class: 'v' }, usd(p.tvl), ' ', h('span', { class: `delta ${p.tvlChange7d > 0 ? 'up' : p.tvlChange7d < 0 ? 'down' : 'flat'}` }, pct(p.tvlChange7d))),
         h('span', {}, 'Fees 30d'), h('span', { class: 'v' }, usd(p.fees30d)),
-        h('span', {}, p.symbol ? `${p.symbol} price` : 'Token'), h('span', { class: 'v' }, p.price != null ? usd(p.price) : '—', ' ', p.price != null ? h('span', { class: `delta ${p.priceChange7d > 0 ? 'up' : p.priceChange7d < 0 ? 'down' : 'flat'}` }, pct(p.priceChange7d)) : null)),
+        h('span', {}, p.symbol ? `${p.symbol} price` : 'Token'), h('span', { class: 'v' }, p.price != null ? usdPrice(p.price) : '—', ' ', p.price != null ? h('span', { class: `delta ${p.priceChange7d > 0 ? 'up' : p.priceChange7d < 0 ? 'down' : 'flat'}` }, pct(p.priceChange7d)) : null)),
       h('div', { class: 'w-spark' }, sparkline(p.tvlSpark, { height: 36 })),
     ));
     const srcs = [watch[0]?.srcTvl ? { ...watch[0].srcTvl, label: 'TVL & fees (each protocol page links its own endpoint)', page: 'https://defillama.com/', api: null } : null, idx.priceSnapshot ? { ...idx.priceSnapshot, label: 'token prices, one request for all tokens' } : watch.find((p) => p.srcPrice)?.srcPrice ? { ...watch.find((p) => p.srcPrice).srcPrice, label: 'token prices', page: 'https://www.coingecko.com/', api: null } : null].filter(Boolean);

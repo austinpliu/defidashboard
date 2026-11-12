@@ -22,6 +22,7 @@ import { fetchCoinMarkets, buildCoinRows, fetchPredictionEvents, buildPrediction
 import { probeEmissionsRepo, EMISSIONS_REPO, loadManualUnlocks, buildTokenUnlocks } from './lib/unlocks.mjs';
 import { sourceRecord, derivedRecord, carryForward } from './lib/sources.mjs';
 import { fetchWeeklyPrices, fundamentalsInputs } from './lib/fundamentals.mjs';
+import { valuationRatios, valuationSources } from './lib/valuation.mjs';
 import { roundSmart, num, slugify, normSeries, dailySeries, trimDays, compactSeries } from './lib/util.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -581,31 +582,13 @@ async function main() {
     } else {
       doc.token = { unavailable: 'No token configured for this protocol' };
     }
-    const fees30 = num(doc.fees?.total30d);
-    const rev30 = num(doc.revenue?.total30d);
-    const mcap = num(t?.market?.marketCap);
-    const fdv = num(t?.market?.fdv);
-    const tvl = num(doc.tvl?.value);
-    const annual = (x) => (x != null ? (x * 365) / 30 : null);
-    const ratio = (a, b) => (a != null && b != null && b > 0 ? roundSmart(a / b) : null);
-    doc.derived = {
-      annualizedFees: { value: roundSmart(annual(fees30)), src: 'calc-annual-fees' },
-      annualizedRevenue: { value: roundSmart(annual(rev30)), src: 'calc-annual-revenue' },
-      mcapToFees: { value: ratio(mcap, annual(fees30)), src: 'calc-mcap-fees' },
-      mcapToRevenue: { value: ratio(mcap, annual(rev30)), src: 'calc-mcap-revenue' },
-      fdvToFees: { value: ratio(fdv, annual(fees30)), src: 'calc-fdv-fees' },
-      mcapToTvl: { value: ratio(mcap, tvl), src: 'calc-mcap-tvl' },
-      revenueShare: { value: fees30 && rev30 != null ? roundSmart((rev30 / fees30) * 100) : null, src: 'calc-revenue-share' },
-    };
-    // ratios cite the request the market cap actually came from (the shared price snapshot when it loaded)
-    const mSrc = t?.market?.src || 'cg-coin';
-    doc.sources['calc-annual-fees'] = derivedRecord({ label: 'Annualized fees', from: ['dl-fees'], formula: 'Last 30 days of fees × 365 ÷ 30' });
-    doc.sources['calc-annual-revenue'] = derivedRecord({ label: 'Annualized revenue', from: ['dl-revenue'], formula: 'Last 30 days of revenue × 365 ÷ 30' });
-    doc.sources['calc-mcap-fees'] = derivedRecord({ label: 'Market cap ÷ annualized fees', from: [mSrc, 'dl-fees'], formula: 'CoinGecko market cap ÷ (30-day fees × 365 ÷ 30)' });
-    doc.sources['calc-mcap-revenue'] = derivedRecord({ label: 'Market cap ÷ annualized revenue', from: [mSrc, 'dl-revenue'], formula: 'CoinGecko market cap ÷ (30-day revenue × 365 ÷ 30)' });
-    doc.sources['calc-fdv-fees'] = derivedRecord({ label: 'Fully diluted value ÷ annualized fees', from: [mSrc, 'dl-fees'], formula: 'CoinGecko FDV ÷ (30-day fees × 365 ÷ 30)' });
-    doc.sources['calc-mcap-tvl'] = derivedRecord({ label: 'Market cap ÷ TVL', from: [mSrc, 'dl-protocol'], formula: 'CoinGecko market cap ÷ DefiLlama TVL' });
-    doc.sources['calc-revenue-share'] = derivedRecord({ label: 'Revenue as % of fees', from: ['dl-fees', 'dl-revenue'], formula: '30-day revenue ÷ 30-day fees × 100' });
+    // What the market pays for a year of fees, of revenue, and of revenue that reaches holders.
+    // Market cap and FDV come from the price snapshot, so every ratio uses the same price.
+    doc.derived = valuationRatios({
+      fees30: doc.fees?.total30d, rev30: doc.revenue?.total30d, hold30: doc.holdersRevenue?.total30d,
+      mcap: t?.market?.marketCap, fdv: t?.market?.fdv, tvl: doc.tvl?.value,
+    });
+    Object.assign(doc.sources, valuationSources(t?.market?.src || 'cg-coin'));
 
     doc.news = feedItemsAll
       .filter((i) => i.protocols.includes(doc.slug))
@@ -757,6 +740,17 @@ async function main() {
       tvlSpark: doc.tvl?.series ? doc.tvl.series.slice(-30).map((p) => p[1]) : [],
       fees30d: doc.fees?.total30d ?? null,
       revenue30d: doc.revenue?.total30d ?? null,
+      holdersRevenue30d: doc.holdersRevenue?.total30d ?? null,
+      // why a figure is missing (shown on hover instead of a guess)
+      feesNote: doc.fees?.unavailable || null,
+      revenueNote: doc.revenue?.unavailable || null,
+      holdersRevenueNote: doc.holdersRevenue?.unavailable || null,
+      // calculated ratios (formulas in each protocol file's sources): value ÷ (30-day total × 365 ÷ 30)
+      valuation: Object.fromEntries(Object.entries(doc.derived || {}).map(([k, v]) => [k, v.value])),
+      srcChart: token?.series?.src ? token.sources[token.series.src] || null : null,
+      srcFees: doc.sources['dl-fees'] || null,
+      srcRevenue: doc.sources['dl-revenue'] || null,
+      srcHolders: doc.sources['dl-holders-revenue'] || null,
       price: token?.market?.price ?? null,
       priceChange24h: token?.market?.change24h ?? null,
       priceChange7d: token?.market?.change7d ?? null,

@@ -233,6 +233,26 @@ export function snapshotNote(snap, { extra = '' } = {}) {
     ', so a token shows the same numbers in every table on this site.', extra ? ` ${extra}` : '');
 }
 
+/**
+ * Small "check it yourself" links for one table row: [['fees', sourceRecord], ...].
+ * Each opens the exact API endpoint the number came from; hovering shows when it was fetched.
+ * A source that failed (and isn't a stale copy) is shown struck through with the reason.
+ */
+export function srcLinks(pairs) {
+  const out = h('span', { class: 'sub' });
+  (pairs || []).filter(([, s]) => s).forEach(([label, s], i) => {
+    if (i) out.append(' · ');
+    const when = s.stale ? s.stale.lastGoodAt : s.fetchedAt;
+    const href = s.api && s.api.startsWith('http') ? s.api.split(' ')[0] : s.page;
+    if (!s.ok && !s.stale) {
+      out.append(h('span', { title: `Not available: ${s.error || 'the request failed'}`, style: { textDecoration: 'line-through' } }, label));
+      return;
+    }
+    out.append(extLink(href, label, { title: `${s.name}${when ? `, fetched ${dateTime(when)}` : ''}${s.stale ? ' (stale copy: the latest fetch failed)' : ''}` }) || label);
+  });
+  return out;
+}
+
 export function unavailable(title, reason) {
   return h('div', { class: 'unavailable', role: 'note' }, svgIcon('alert'), h('div', {}, h('div', { class: 'u-title' }, title || 'Unavailable'), reason ? h('div', {}, reason) : null));
 }

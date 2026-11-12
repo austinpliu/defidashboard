@@ -309,3 +309,55 @@ test('coin list rows for tracked tokens take the snapshot numbers', () => {
   assert.equal(rows.find((r) => r.id === 'btc').price, 9);
   assert.equal(buildCoinRows(list, { ok: false }, new Set(['aave']), null).find((r) => r.id === 'aave').price, 113.51, 'without a snapshot the list’s own number stands');
 });
+
+// ---------- valuation ratios ----------
+import { valuationRatios, valuationSources, annualize, ratioOf, shareOf } from '../scripts/lib/valuation.mjs';
+
+test('valuation ratios: value ÷ a year at the last 30 days’ pace', () => {
+  // Hyperliquid, 12 Nov 2026: market cap $17.14B, 30-day revenue $68.82M → 20.47×
+  const v = valuationRatios({ fees30: 89_581_591, rev30: 68_824_519, hold30: 68_824_519, mcap: 17_139_842_417, fdv: 68_123_441_241, tvl: 7_712_889_420 });
+  assert.equal(v.mcapToRevenue.value, 20.47);
+  assert.equal(v.mcapToFees.value, 15.73);
+  assert.equal(v.mcapToHoldersRevenue.value, 20.47);
+  assert.equal(v.fdvToRevenue.value, 81.35);
+  assert.equal(v.revenueShare.value, 76.83);
+  assert.equal(v.holdersShare.value, 100);
+  assert.equal(v.mcapToFdv.value, 25.16);
+  assert.equal(v.annualizedRevenue.value, Math.round((68_824_519 * 365) / 30));
+  assert.equal(v.mcapToRevenue.src, 'calc-mcap-revenue');
+});
+
+test('valuation ratios: no revenue or no data gives no multiple, never a made-up one', () => {
+  // Ondo: fees are holders' yield, revenue is $0
+  const ondo = valuationRatios({ fees30: 7_737_562, rev30: 0, hold30: 0, mcap: 1.7e9, fdv: 3.5e9, tvl: null });
+  assert.equal(ondo.mcapToRevenue.value, null);
+  assert.equal(ondo.mcapToHoldersRevenue.value, null);
+  assert.equal(ondo.fdvToRevenue.value, null);
+  assert.equal(ondo.revenueShare.value, 0);
+  assert.equal(ondo.holdersShare.value, null, 'a share of zero revenue is undefined');
+  assert.equal(ondo.mcapToTvl.value, null);
+  assert.equal(ondo.annualizedRevenue.value, 0);
+  // Ethena: DefiLlama has no holders-revenue data at all
+  const ena = valuationRatios({ fees30: 17e6, rev30: 62_046, hold30: undefined, mcap: 1.9e9, fdv: 2.1e9, tvl: 5e9 });
+  assert.equal(ena.annualizedHoldersRevenue.value, null);
+  assert.equal(ena.mcapToHoldersRevenue.value, null);
+  assert.ok(ena.mcapToRevenue.value > 2000, 'a tiny revenue gives a huge multiple, shown as it is');
+  // no token
+  const none = valuationRatios({ fees30: 1e6, rev30: 1e5, hold30: 0, mcap: null, fdv: null, tvl: 1e9 });
+  assert.equal(none.mcapToFees.value, null);
+  assert.equal(none.mcapToFdv.value, null);
+  assert.equal(annualize(null), null);
+  assert.equal(ratioOf(10, -1), null, 'negative revenue gives no multiple');
+  assert.equal(shareOf(1, 0), null);
+});
+
+test('every ratio has a "Calculated" source naming its inputs and formula', () => {
+  const v = valuationRatios({ fees30: 1, rev30: 1, hold30: 1, mcap: 1, fdv: 1, tvl: 1 });
+  const S = valuationSources('cg-snapshot');
+  for (const [k, x] of Object.entries(v)) {
+    assert.ok(S[x.src], `${k} → ${x.src}`);
+    assert.equal(S[x.src].derived, true);
+    assert.ok(S[x.src].formula.length > 10);
+  }
+  assert.deepEqual(S['calc-mcap-holders'].from, ['cg-snapshot', 'dl-holders-revenue']);
+});

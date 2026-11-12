@@ -2,11 +2,11 @@
 // number formatting, takeaway headline rules, series math and CSV output.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { usd, pct, ratio, compact, date, relative, direction } from '../site/assets/js/format.js';
+import { usd, usdPrice, pct, ratio, compact, date, relative, direction } from '../site/assets/js/format.js';
 import {
   trendTakeaway, chainTakeaway, leaderTakeaway, stablecoinTakeaway, moversTakeaway, flowTakeaway, revenueTakeaway,
   valuationTakeaway, supplyTakeaway, liquidityTakeaway, yieldTakeaway, compareTakeaway, catalystTakeaway, priceTakeaway, seriesChange,
-  categoryTakeaway,
+  categoryTakeaway, priceMovesTakeaway, tokenValuationTakeaway,
 } from '../site/assets/js/takeaways.js';
 import { trimDays, indexTo100, weeklySum, rollingSum, monthlyLast, valueAt, changeOver } from '../site/assets/js/series.js';
 import { toCSV } from '../site/assets/js/export.js';
@@ -203,4 +203,45 @@ test('categoryTakeaway names the headline basis and handles ties', () => {
   assert.match(text(categoryTakeaway([{ category: 'Lending', share: 30.2 }, { category: 'Dexs', share: 29.8 }], { denominator: 'headline' })), /Lending and Dexs are DeFi's largest categories/);
   assert.match(text(categoryTakeaway([{ category: 'Lending', share: 70 }], { denominator: 'attributed' })), /of the TVL in these categories/);
   assert.equal(categoryTakeaway([]), null);
+});
+
+// ---- Tokens page headlines (Nov 2026 content audit) ----
+
+test('priceMovesTakeaway never calls the smallest loser the biggest', () => {
+  // the old rule printed "COMP lost the most this week" when COMP was the one that fell least
+  const allDown = [{ symbol: 'COMP', change: -0.9 }, { symbol: 'AAVE', change: -13.4 }, { symbol: 'ENA', change: -15.3 }];
+  assert.equal(text(priceMovesTakeaway(allDown)), 'All 3 tracked tokens fell over the past 7 days; ENA fell most (−15.3%), COMP least (−0.90%)');
+  const mixed = [{ symbol: 'COMP', change: 0.92 }, { symbol: 'AAVE', change: -13.4 }, { symbol: 'ENA', change: -15.3 }, { symbol: 'X', change: null }];
+  assert.equal(text(priceMovesTakeaway(mixed)), 'COMP rose most over the past 7 days (+0.92%); ENA fell most (−15.3%). 1 of 3 tracked tokens rose');
+  const allUp = [{ symbol: 'A', change: 4 }, { symbol: 'B', change: 9 }];
+  assert.equal(text(priceMovesTakeaway(allUp, 'the past 30 days')), 'All 2 tracked tokens rose over the past 30 days; B rose most (+9.0%), A least (+4.0%)');
+  // a flat token is neither a riser nor a faller
+  assert.equal(text(priceMovesTakeaway([{ symbol: 'A', change: 0 }, { symbol: 'B', change: -4 }])), 'No tracked token rose over the past 7 days; B fell most (−4.0%)');
+  // ties are named together, and there is nothing to say about one token or none
+  assert.match(text(priceMovesTakeaway([{ symbol: 'A', change: 5 }, { symbol: 'B', change: 5 }, { symbol: 'C', change: -1 }])), /^A and B rose most/);
+  assert.equal(priceMovesTakeaway([{ symbol: 'A', change: 5 }]), null);
+  assert.equal(priceMovesTakeaway([{ symbol: 'A', change: 0 }, { symbol: 'B', change: 0 }]), null);
+  assert.equal(priceMovesTakeaway([]), null);
+});
+
+test('tokenValuationTakeaway ranks only tokens that have revenue', () => {
+  const rows = [
+    { symbol: 'SKY', multiple: 8.5, revenue30d: 13e6 }, { symbol: 'HYPE', multiple: 20.5, revenue30d: 68e6 },
+    { symbol: 'ONDO', multiple: null, revenue30d: 0 }, { symbol: 'MORPHO', multiple: null, revenue30d: 0 }, { symbol: 'NEW', multiple: null, revenue30d: null },
+  ];
+  assert.equal(text(tokenValuationTakeaway(rows)), 'SKY has the lowest market cap ÷ revenue (8.50×) of the 2 tracked tokens with revenue; HYPE the highest (20.5×). 2 of the 5 record no protocol revenue, so they have no multiple');
+  assert.match(text(tokenValuationTakeaway(rows, { basisLabel: 'FDV' })), /lowest fdv ÷ revenue/);
+  assert.match(text(tokenValuationTakeaway([{ symbol: 'A', multiple: 8.501, revenue30d: 1 }, { symbol: 'B', multiple: 8.499, revenue30d: 1 }, { symbol: 'C', multiple: 30, revenue30d: 1 }])), /^A and B share the lowest|^B and A share the lowest/);
+  assert.match(text(tokenValuationTakeaway([{ symbol: 'A', multiple: 12, revenue30d: 1 }, { symbol: 'B', multiple: null, revenue30d: 0 }])), /^A is the only tracked token with a revenue multiple/);
+  assert.equal(tokenValuationTakeaway([{ symbol: 'B', multiple: null, revenue30d: 0 }]), null);
+  assert.equal(tokenValuationTakeaway([]), null);
+});
+
+test('usdPrice keeps the cents a compact dollar figure would drop', () => {
+  assert.equal(usd(114.25), '$114', 'the compact form is right for totals');
+  assert.equal(usdPrice(114.25), '$114.25', 'but a price needs its cents to be checked by hand');
+  assert.equal(usdPrice(72.1), '$72.10');
+  assert.equal(usdPrice(0.35521), '$0.3552');
+  assert.equal(usdPrice(104250.4), '$104,250');
+  assert.equal(usdPrice(null), '—');
 });

@@ -66,6 +66,19 @@ test('pipeline writes every file with sources and handles failures honestly', ()
     assert.equal(idxA.fdv, tokA.market.fdv);
     assert.equal(idxA.priceFromSnapshot, true);
     assert.ok(idx.priceSnapshot?.api.includes('ids='), 'the index names the one request all prices came from');
+    // the Tokens table reads everything from the index: fees, revenue, holders revenue, multiples and their endpoints
+    assert.equal(idxA.fees30d, alpha.fees.total30d);
+    assert.equal(idxA.revenue30d, alpha.revenue.total30d);
+    assert.equal(idxA.holdersRevenue30d, null, 'no holders-revenue data stays empty');
+    assert.ok(idxA.holdersRevenueNote, 'and the reason is kept');
+    assert.equal(idxA.valuation.mcapToRevenue, alpha.derived.mcapToRevenue.value);
+    assert.equal(idxA.valuation.mcapToHoldersRevenue, null);
+    assert.ok(idxA.valuation.fdvToRevenue > idxA.valuation.mcapToRevenue);
+    assert.ok(idxA.srcFees.api.includes('/summary/fees/alpha') && idxA.srcFees.fetchedAt, 'each figure keeps its exact endpoint and fetch time');
+    assert.ok(idxA.srcRevenue.api.includes('dailyRevenue'));
+    assert.equal(idxA.srcHolders.ok, false);
+    assert.ok(idxA.srcChart.api.includes('market_chart'));
+    assert.equal(alpha.sources['calc-mcap-holders'].derived, true);
 
     const missing = read('tokens/missing-coin.json');
     assert.equal(missing.market.src, 'dl-coin', 'falls back to DefiLlama price when CoinGecko fails');
