@@ -14,7 +14,7 @@ import {
   DL, fetchGlobal, buildMarket, buildScreener, fetchProtocolRaw, buildProtocolCore, resolveSlug,
   childSlugs, familyIds, poolsForProtocol, hacksForProtocol, fetchChainHistory, fetchStableHistory, fetchLlamaCoin,
 } from './lib/defillama.mjs';
-import { fetchCoinRaw, buildToken, applyLlamaFallback, searchCoin } from './lib/coingecko.mjs';
+import { fetchCoinRaw, buildToken, applyLlamaFallback, searchCoin, fetchPriceSnapshot, applySnapshot, CG } from './lib/coingecko.mjs';
 import { fetchNetworkMap, fetchTokenPools } from './lib/dex.mjs';
 import { spacesFromSources, fetchProposals } from './lib/governance.mjs';
 import { fetchFeed, feedItems } from './lib/feeds.mjs';
@@ -332,6 +332,23 @@ async function main() {
     job.protocol.token = token;
   }
 
+  // 3b. One price snapshot for every tracked token ---------------------------
+  // The per-token requests above are spaced out over several minutes, and the market list
+  // further down is another request again, so the same token used to show slightly different
+  // prices in different tables. This single request is the one source for every tracked
+  // token's price, market cap, FDV, volume and price changes, everywhere on the site.
+  let snapshot = { ok: false, byId: new Map(), source: null };
+  if (tokens.length) {
+    snapshot = await fetchPriceSnapshot(http, tokens.map((t) => t.id));
+    probe('price snapshot', { ok: snapshot.ok, data: [...snapshot.byId.values()] });
+    const missed = [];
+    for (const t of tokens) {
+      if (!applySnapshot(t, snapshot.byId.get(t.id), snapshot.source, { page: `${CG.site}/${t.id}` })) missed.push(t.id);
+    }
+    if (!snapshot.ok) problem('warn', `CoinGecko price snapshot failed (${snapshot.source.error}), so tracked tokens show the prices fetched one by one a few minutes apart`);
+    else if (missed.length) problem('info', `The price snapshot has no row for ${missed.join(', ')}; ${missed.length === 1 ? 'that token keeps' : 'those tokens keep'} the price from ${missed.length === 1 ? 'its' : 'their'} own request`);
+  }
+
   // 4. DEX liquidity (GeckoTerminal, DexScreener fallback) --------------------
   console.log('\n== DEX liquidity');
   // GeckoTerminal's network list is only fetched if some platform needs it
@@ -580,12 +597,14 @@ async function main() {
       mcapToTvl: { value: ratio(mcap, tvl), src: 'calc-mcap-tvl' },
       revenueShare: { value: fees30 && rev30 != null ? roundSmart((rev30 / fees30) * 100) : null, src: 'calc-revenue-share' },
     };
+    // ratios cite the request the market cap actually came from (the shared price snapshot when it loaded)
+    const mSrc = t?.market?.src || 'cg-coin';
     doc.sources['calc-annual-fees'] = derivedRecord({ label: 'Annualized fees', from: ['dl-fees'], formula: 'Last 30 days of fees × 365 ÷ 30' });
     doc.sources['calc-annual-revenue'] = derivedRecord({ label: 'Annualized revenue', from: ['dl-revenue'], formula: 'Last 30 days of revenue × 365 ÷ 30' });
-    doc.sources['calc-mcap-fees'] = derivedRecord({ label: 'Market cap ÷ annualized fees', from: ['cg-coin', 'dl-fees'], formula: 'CoinGecko market cap ÷ (30-day fees × 365 ÷ 30)' });
-    doc.sources['calc-mcap-revenue'] = derivedRecord({ label: 'Market cap ÷ annualized revenue', from: ['cg-coin', 'dl-revenue'], formula: 'CoinGecko market cap ÷ (30-day revenue × 365 ÷ 30)' });
-    doc.sources['calc-fdv-fees'] = derivedRecord({ label: 'Fully diluted value ÷ annualized fees', from: ['cg-coin', 'dl-fees'], formula: 'CoinGecko FDV ÷ (30-day fees × 365 ÷ 30)' });
-    doc.sources['calc-mcap-tvl'] = derivedRecord({ label: 'Market cap ÷ TVL', from: ['cg-coin', 'dl-protocol'], formula: 'CoinGecko market cap ÷ DefiLlama TVL' });
+    doc.sources['calc-mcap-fees'] = derivedRecord({ label: 'Market cap ÷ annualized fees', from: [mSrc, 'dl-fees'], formula: 'CoinGecko market cap ÷ (30-day fees × 365 ÷ 30)' });
+    doc.sources['calc-mcap-revenue'] = derivedRecord({ label: 'Market cap ÷ annualized revenue', from: [mSrc, 'dl-revenue'], formula: 'CoinGecko market cap ÷ (30-day revenue × 365 ÷ 30)' });
+    doc.sources['calc-fdv-fees'] = derivedRecord({ label: 'Fully diluted value ÷ annualized fees', from: [mSrc, 'dl-fees'], formula: 'CoinGecko FDV ÷ (30-day fees × 365 ÷ 30)' });
+    doc.sources['calc-mcap-tvl'] = derivedRecord({ label: 'Market cap ÷ TVL', from: [mSrc, 'dl-protocol'], formula: 'CoinGecko market cap ÷ DefiLlama TVL' });
     doc.sources['calc-revenue-share'] = derivedRecord({ label: 'Revenue as % of fees', from: ['dl-fees', 'dl-revenue'], formula: '30-day revenue ÷ 30-day fees × 100' });
 
     doc.news = feedItemsAll
@@ -681,7 +700,7 @@ async function main() {
   const coinRes = await fetchCoinMarkets(http);
   probe('coin markets', coinRes.all);
   probe('coin markets (DeFi)', coinRes.defi);
-  const freshCoins = buildCoinRows(coinRes.all, coinRes.defi, new Set(tokens.map((t) => t.id)));
+  const freshCoins = buildCoinRows(coinRes.all, coinRes.defi, new Set(tokens.map((t) => t.id)), snapshot.ok ? snapshot.byId : null);
   const coinsSrc = freshCoins ? coinRes.sources['cg-markets'] : { ...coinRes.sources['cg-markets'], ok: false, error: coinRes.sources['cg-markets'].error || 'Unexpected response shape' };
   const prevCoins = readJSON(join(OUT, 'coins.json'));
   const coinCarry = carryForward({ freshData: freshCoins, freshSource: coinsSrc, prevData: prevCoins?.rows ?? null, prevSource: prevCoins?.sources?.['cg-markets'] });
@@ -690,7 +709,9 @@ async function main() {
   const coinsDoc = {
     generatedAt: new Date().toISOString(),
     rows: coinCarry.data,
-    sources: { ...coinRes.sources, 'cg-markets': coinCarry.source },
+    sources: { ...coinRes.sources, 'cg-markets': coinCarry.source, ...(snapshot.ok ? { 'cg-snapshot': snapshot.source } : {}) },
+    // tracked tokens' rows carry the snapshot's numbers, so a token never shows two prices on one page
+    snapshotRows: coinCarry.data ? coinCarry.data.filter((r) => r.snapshot).length : 0,
     ...(coinCarry.data ? {} : { unavailable: coinsSrc.error }),
   };
 
@@ -718,6 +739,8 @@ async function main() {
   // 10. Index (nav, search, watchlist strip) ----------------------------------
   const index = {
     generatedAt: new Date().toISOString(),
+    // the one request every tracked token's price, market cap and FDV come from (null if it failed)
+    priceSnapshot: snapshot.ok ? snapshot.source : null,
     protocols: protocols.map(({ entry, doc, token }) => ({
       slug: doc.slug,
       name: entry.name,
@@ -737,7 +760,14 @@ async function main() {
       price: token?.market?.price ?? null,
       priceChange24h: token?.market?.change24h ?? null,
       priceChange7d: token?.market?.change7d ?? null,
+      priceChange30d: token?.market?.change30d ?? null,
+      priceChange90d: token?.market?.change90d ?? null,
+      priceChange1y: token?.market?.change1y ?? null,
       mcap: token?.market?.marketCap ?? null,
+      fdv: token?.market?.fdv ?? null,
+      volume24h: token?.market?.volume24h ?? null,
+      // true when this token's numbers come from the shared snapshot (one request for all tokens)
+      priceFromSnapshot: token?.market?.src === 'cg-snapshot',
       priceSpark: token?.market?.sparkline7d || [],
       srcTvl: doc.sources['dl-protocol'],
       srcPrice: token ? token.sources[token.market?.src] || token.sources['cg-coin'] : null,

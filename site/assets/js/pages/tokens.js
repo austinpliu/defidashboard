@@ -1,5 +1,5 @@
 // 03 — Tokens overview
-import { h, band, sourceLine, pageError, sparkline, takeaway, extLink, unavailable } from '../ui.js';
+import { h, band, sourceLine, pageError, sparkline, takeaway, extLink, unavailable, snapshotNote } from '../ui.js';
 import { chartCard } from '../cards.js';
 import { loadMany } from '../data.js';
 import { divergingChart } from '../charts.js';
@@ -15,6 +15,12 @@ export async function render(root) {
   const C = (coins?.rows || []).map((r) => ({ ...r, groupLabel: r.defi === true ? 'DeFi' : r.defi === false ? 'Other' : 'Unknown' }));
   root.append(band({ n: '03', tag: 'Section 03 · Tokens', title: 'Tokens', sub: `${rows.length} tokens belonging to the protocols you track${C.length ? `, plus ${C.length} coins from CoinGecko’s market list` : ''}. Prices from CoinGecko’s public API.` }));
   const delta = (v) => h('span', { class: `delta ${v > 0 ? 'up' : v < 0 ? 'down' : 'flat'}` }, pct(v));
+  // the one request all tracked prices come from; tokens it missed keep their own request
+  const snap = idx.priceSnapshot || null;
+  const own = rows.filter((r) => !r.priceFromSnapshot && r.srcPrice);
+  const priceSrc = snap
+    ? [snap, ...own.map((r) => ({ ...r.srcPrice, label: `${r.symbol || r.tokenId}: not in the snapshot, fetched on its own` }))]
+    : rows.filter((r) => r.srcPrice).map((r) => ({ ...r.srcPrice, label: `${r.symbol || r.tokenId} price` }));
   root.append(h('section', { class: 'card' },
     h('div', { class: 'kicker' }, 'Prices'),
     (() => {
@@ -38,7 +44,8 @@ export async function render(root) {
       ],
       rows,
     }),
-    sourceLine([rows.find((r) => r.srcPrice)?.srcPrice].filter(Boolean).map((s) => ({ ...s, label: 'token prices (each token page links its exact endpoint)' })))));
+    snapshotNote(snap),
+    sourceLine(priceSrc)));
   const withChg = rows.filter((r) => r.priceChange7d != null).sort((a, b) => b.priceChange7d - a.priceChange7d);
   if (withChg.length >= 2) {
     const best = withChg[0];
@@ -49,7 +56,7 @@ export async function render(root) {
       take: { pre: `${best.symbol} `, hl: `${best.priceChange7d >= 0 ? 'gained' : 'lost'} the most this week (${pct(best.priceChange7d, { digits: 0 })})`, post: worst.priceChange7d < 0 ? `; ${worst.symbol} fell ${pct(Math.abs(worst.priceChange7d), { signed: false, digits: 0 })}` : '' },
       title: '7-day price change, tracked tokens',
       build: divergingChart({ items: withChg.map((r) => ({ name: r.symbol, value: r.priceChange7d, sub: r.name })) }),
-      src: withChg[0].srcPrice,
+      src: priceSrc,
       csvName: 'token-7d-change',
       table: () => ({ columns: [{ key: 'symbol', label: 'Token' }, { key: 'priceChange7d', label: '7d change', num: true, fmt: (v) => pct(v) }], rows: withChg }),
     })));
@@ -62,6 +69,7 @@ export async function render(root) {
     h('div', { class: 'kicker' }, 'All coins'),
     takeaway(top.length ? { pre: '', hl: `${top.filter((r) => r.change7d > 0).length} of the ${top.length} largest coins rose`, post: ' over the past 7 days' } : null, 'The largest coins by market cap'),
     C.length ? h('p', { class: 'chart-note' }, `${C.length} coins: CoinGecko’s 250 largest by market cap, plus the 250 largest in its DeFi category. Coins you track link to their page here; the rest link to CoinGecko.`) : null,
+    C.some((r) => r.snapshot) ? h('p', { class: 'chart-note' }, `The ${C.filter((r) => r.snapshot).length} highlighted rows are tokens you track. Their numbers come from the price snapshot used in the table above, not from this list’s own request, so each token shows one price on this page.`) : null,
     C.length
       ? dataTable({
         caption: 'All coins', csvName: 'coins', sortKey: 'rank', sortDir: 'asc', pageSize: 50,
@@ -83,5 +91,5 @@ export async function render(root) {
         csvExtra: [{ label: 'CoinGecko page', get: (r) => r.page }],
       })
       : unavailable('Coin list unavailable', coins?.unavailable || files['coins.json'].error),
-    sourceLine([cs['cg-markets'], cs['cg-markets-defi']].filter(Boolean))));
+    sourceLine([cs['cg-markets'], cs['cg-markets-defi'], cs['cg-snapshot'] ? { ...cs['cg-snapshot'], label: 'Price snapshot (rows for the tokens you track)' } : null].filter(Boolean))));
 }

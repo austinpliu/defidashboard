@@ -19,6 +19,102 @@ export async function fetchCoinRaw(http, id) {
   return { coin, chart };
 }
 
+/**
+ * One price snapshot for every tracked token: a single request, so every table on the site
+ * shows the same price, market cap and FDV for a token, with one fetch time and one link.
+ * CoinGecko /coins/markets with ids= (documented, keyless).
+ */
+export function snapshotUrl(ids) {
+  return `${CG.api}/coins/markets?vs_currency=usd&ids=${ids.map(encodeURIComponent).join(',')}&order=market_cap_desc&per_page=250&page=1&sparkline=false&price_change_percentage=24h,7d,14d,30d,200d,1y`;
+}
+
+export async function fetchPriceSnapshot(http, ids) {
+  const res = await http.json(snapshotUrl(ids), { label: 'CoinGecko price snapshot (all tracked tokens, one request)', retries: 2, backoffMs: 15000 });
+  const list = res.ok && Array.isArray(res.data) ? res.data : null;
+  const byId = new Map((list || []).filter((c) => c?.id && num(c.current_price) !== null).map((c) => [c.id, c]));
+  const ok = byId.size > 0;
+  return {
+    byId,
+    ok,
+    source: sourceRecord({
+      name: 'CoinGecko',
+      label: 'Price snapshot: price, market cap, FDV, volume and price changes for every tracked token, from one request',
+      page: 'https://www.coingecko.com/',
+      res: ok ? res : { ...res, ok: false, error: res.error || 'The snapshot returned no tracked tokens' },
+    }),
+  };
+}
+
+/** % change from the daily close `days` before the snapshot to the snapshot price. */
+export function changeVsSeries(price, series, days, nowSec) {
+  if (num(price) === null || !Array.isArray(series) || !series.length) return null;
+  const target = nowSec - days * 86400;
+  let best = null;
+  for (const p of series) {
+    if (p[0] <= target + 43200) best = p;
+    else break;
+  }
+  // no close within two days of the target date: say nothing rather than stretch the window
+  if (!best || target - best[0] > 2 * 86400 || !(best[1] > 0)) return null;
+  return ((price - best[1]) / best[1]) * 100;
+}
+
+/**
+ * Overwrite a token's live market fields with the snapshot row, so price, market cap, FDV,
+ * volume and the price changes all come from the same request. Returns true if applied.
+ */
+export function applySnapshot(token, row, source, { srcKey = 'cg-snapshot', page } = {}) {
+  if (!token || !row || num(row.current_price) === null) return false;
+  const prev = token.market || {};
+  const nowSec = Math.floor(Date.parse(source.fetchedAt || new Date().toISOString()) / 1000);
+  token.sources[srcKey] = { ...source, page: page || source.page };
+  token.market = {
+    ...prev,
+    price: roundSmart(row.current_price),
+    change24h: roundSmart(row.price_change_percentage_24h_in_currency ?? row.price_change_percentage_24h),
+    change7d: roundSmart(row.price_change_percentage_7d_in_currency),
+    change14d: roundSmart(row.price_change_percentage_14d_in_currency),
+    change30d: roundSmart(row.price_change_percentage_30d_in_currency),
+    change200d: roundSmart(row.price_change_percentage_200d_in_currency),
+    change1y: roundSmart(row.price_change_percentage_1y_in_currency),
+    // 90 days isn't published by CoinGecko: snapshot price vs the daily close 90 days earlier
+    change90d: roundSmart(changeVsSeries(row.current_price, token.series?.price, 90, nowSec)),
+    change90dCalculated: true,
+    marketCap: roundSmart(row.market_cap) || null,
+    fdv: roundSmart(row.fully_diluted_valuation) || null,
+    volume24h: roundSmart(row.total_volume),
+    high24h: roundSmart(row.high_24h),
+    low24h: roundSmart(row.low_24h),
+    ath: roundSmart(row.ath) ?? prev.ath ?? null,
+    athDate: row.ath_date || prev.athDate || null,
+    athChange: roundSmart(row.ath_change_percentage) ?? prev.athChange ?? null,
+    rank: row.market_cap_rank ?? prev.rank ?? null,
+    lastUpdated: row.last_updated || prev.lastUpdated || null,
+    src: srcKey,
+    asOf: source.fetchedAt || null,
+  };
+  delete token.market.partial;
+  delete token.market.priceTime;
+  delete token.market.confidence;
+  // CoinGecko's own TVL ratios came from the per-token request, at a different price
+  delete token.market.mcapToTvl;
+  delete token.market.fdvToTvl;
+  // if the per-token request failed, the snapshot still carries the supply figures
+  const circ = num(row.circulating_supply);
+  if (!token.supply && circ !== null) {
+    const total = num(row.total_supply);
+    const max = num(row.max_supply);
+    token.supply = {
+      circulating: roundSmart(circ), total: roundSmart(total), max: roundSmart(max), maxInfinite: false,
+      circulatingPctOfMax: circ && (max || total) ? roundSmart((circ / (max || total)) * 100) : null,
+      notYetCirculating: circ && (max || total) ? roundSmart((max || total) - circ) : null,
+      basis: max ? 'max' : total ? 'total' : null,
+      src: srcKey,
+    };
+  }
+  return true;
+}
+
 export async function searchCoin(http, query) {
   const r = await http.json(`${CG.api}/search?query=${encodeURIComponent(query)}`, { label: `CoinGecko search ${query}`, retries: 1, backoffMs: 20000 });
   if (!r.ok) return [];

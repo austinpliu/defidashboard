@@ -47,7 +47,7 @@ export async function render(root) {
     // unfiltered, so "every protocol here" is only said when every row has TVL data
     takeaway(compareTakeaway(watch.map((r) => ({ name: r.name, change: r.tvlChange30d })), 'TVL', 'the last 30 days'), 'Every tracked protocol at a glance'),
     dataTable({ caption: 'Tracked protocols', columns, rows, sortKey: 'tvl', filters: [{ key: 'category', label: 'Category', plural: 'categories' }, { key: 'chains', label: 'Chain' }, { key: 'groupLabel', label: 'List', plural: 'lists' }], csvName: 'watchlist', rowClass: (r) => (r.group === 'watchlist' ? 'is-watch' : null), pageSize: 50 }),
-    sourceLine([rows[0]?.srcTvl, rows.find((r) => r.srcPrice)?.srcPrice].filter(Boolean).map((s) => ({ ...s, label: `${s.label} (each protocol page links its exact endpoint)` }))),
+    sourceLine([rows[0]?.srcTvl ? { ...rows[0].srcTvl, label: 'TVL, fees and revenue (each protocol page links its exact endpoint)' } : null, idx.priceSnapshot || (rows.find((r) => r.srcPrice)?.srcPrice ? { ...rows.find((r) => r.srcPrice).srcPrice, label: 'token prices (each token page links its exact endpoint)' } : null)].filter(Boolean)),
     h('p', { class: 'src' }, 'Mcap ÷ annualized fees is calculated here: CoinGecko market cap ÷ (DefiLlama 30-day fees × 365 ÷ 30).')));
 
   const grid = h('div', { class: 'grid', style: { marginTop: '18px' } });

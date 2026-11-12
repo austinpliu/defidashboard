@@ -63,6 +63,8 @@ export async function render(root, { params }) {
       termKey: 'price',
       take: priceTakeaway(sym, mk, se.price),
       title: `${sym} price in USD, ${rangeLabel(range)}`,
+      // the tiles above use the price snapshot; this chart is daily history from its own request
+      note: mk.src === 'cg-snapshot' && S[se.src]?.fetchedAt ? `Daily history, fetched ${dateTime(S[se.src].fetchedAt)}. Its last point can differ slightly from the price above, which comes from the price snapshot taken at ${dateTime(mk.asOf || msrc?.fetchedAt)}.` : null,
       big: true,
       size: 'tall',
       controls: segmented([{ value: 30, label: '30D' }, { value: 90, label: '90D' }, { value: 365, label: '1Y' }], range, (v) => { range = v; card.update({ build: build(), title: `${sym} price in USD, ${rangeLabel(v)}` }); }, 'Time range'),
@@ -131,7 +133,7 @@ export async function render(root, { params }) {
             h('tr', {}, h('td', {}, term('Max supply', 'maxSupply')), h('td', { class: 'n' }, sup.max ? compact(sup.max, 2) : sup.maxInfinite ? 'no cap' : '—'), h('td', {}, ''))))),
       ]
       : unavailable('Supply unavailable', t.unavailable || 'CoinGecko returned no supply figures.'),
-    src: msrc,
+    src: S[sup.src] || msrc,
     sources: S,
   })));
 

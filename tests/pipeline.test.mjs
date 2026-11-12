@@ -48,6 +48,25 @@ test('pipeline writes every file with sources and handles failures honestly', ()
     assert.ok(alpha.derived.mcapToFees.value > 0);
     assert.equal(alpha.sources['calc-mcap-fees'].derived, true);
 
+    // one price snapshot: the token page, the index, the protocol page and the coin list agree
+    assert.equal(tokA.market.src, 'cg-snapshot', 'tracked tokens take their price from the shared snapshot');
+    assert.equal(tokA.market.price, 101, 'snapshot price, not the per-token request (100) or the market list (500)');
+    assert.ok(tokA.sources['cg-snapshot'].api.includes('ids='), 'the snapshot cites its exact endpoint');
+    assert.ok(tokA.sources['cg-snapshot'].fetchedAt, 'and its fetch time');
+    assert.equal(tokA.market.change30d, 9);
+    assert.equal(tokA.market.change1y, 48);
+    assert.ok(Number.isFinite(tokA.market.change90d), '90-day change is calculated from the snapshot price and the daily history');
+    assert.equal(alpha.token.market.price, 101, 'the protocol page shows the same price');
+    assert.equal(alpha.token.market.marketCap, tokA.market.marketCap);
+    assert.deepEqual(alpha.sources['calc-mcap-fees'].from, ['cg-snapshot', 'dl-fees'], 'ratios cite the snapshot they were calculated from');
+    assert.equal(alpha.derived.mcapToFees.value, Number((tokA.market.marketCap / ((alpha.fees.total30d * 365) / 30)).toFixed(2)));
+    const idx = read('index.json');
+    const idxA = idx.protocols.find((p) => p.slug === 'alpha');
+    assert.equal(idxA.price, 101);
+    assert.equal(idxA.fdv, tokA.market.fdv);
+    assert.equal(idxA.priceFromSnapshot, true);
+    assert.ok(idx.priceSnapshot?.api.includes('ids='), 'the index names the one request all prices came from');
+
     const missing = read('tokens/missing-coin.json');
     assert.equal(missing.market.src, 'dl-coin', 'falls back to DefiLlama price when CoinGecko fails');
     assert.ok(missing.market.partial);
@@ -60,6 +79,11 @@ test('pipeline writes every file with sources and handles failures honestly', ()
     const coins = read('coins.json');
     assert.deepEqual(coins.rows.map((r) => r.id), ['big-coin', 'alpha-token', 'defi-only'], 'union of both lists, by rank');
     assert.equal(coins.rows.find((r) => r.id === 'alpha-token').tracked, true);
+    assert.equal(coins.rows.find((r) => r.id === 'alpha-token').price, 101, 'a tracked token shows the snapshot price in the coin list too');
+    assert.equal(coins.rows.find((r) => r.id === 'alpha-token').snapshot, true);
+    assert.equal(coins.rows.find((r) => r.id === 'big-coin').snapshot, undefined, 'other coins keep the list’s own numbers');
+    assert.ok(coins.sources['cg-snapshot']?.api.includes('ids='));
+    assert.equal(idx.protocols.find((p) => p.tokenId === 'missing-coin').priceFromSnapshot, false, 'a token the snapshot lacks keeps its own request');
     assert.equal(coins.rows.find((r) => r.id === 'big-coin').defi, false);
     assert.ok(coins.sources['cg-markets'].api.includes('/coins/markets'));
     const pred = read('predictions.json');

@@ -243,3 +243,69 @@ test('categoryBreakdown: falls back to category rules when DefiLlama sends no pe
   assert.equal(r3.basis.attributedShare, 150);
   assert.equal(r3.list.reduce((s, c) => s + c.share, 0), 100);
 });
+
+// ---------- one price snapshot per run ----------
+import { applySnapshot, changeVsSeries, snapshotUrl } from '../scripts/lib/coingecko.mjs';
+import { buildCoinRows } from '../scripts/lib/markets.mjs';
+
+test('the snapshot is one request that names every tracked token', () => {
+  const u = snapshotUrl(['aave', 'ondo-finance']);
+  assert.ok(u.includes('/coins/markets?'));
+  assert.ok(u.includes('ids=aave,ondo-finance'));
+  assert.ok(u.includes('price_change_percentage=24h,7d,14d,30d,200d,1y'));
+});
+
+test('changeVsSeries compares the snapshot price with the daily close N days earlier', () => {
+  const now = 1_800_000_000;
+  const hist = Array.from({ length: 120 }, (_, i) => [now - (119 - i) * DAY, 100 + i]);
+  // 90 days before `now` is index 29 → 129
+  assert.equal(changeVsSeries(258, hist, 90, now), 100);
+  assert.equal(changeVsSeries(258, hist, 500, now), null, 'no history that far back: no number');
+  assert.equal(changeVsSeries(null, hist, 90, now), null);
+  assert.equal(changeVsSeries(258, [], 90, now), null);
+  // a gap around the target date is not bridged
+  const gappy = hist.filter(([t]) => t < now - 100 * DAY || t > now - 80 * DAY);
+  assert.equal(changeVsSeries(258, gappy, 90, now), null);
+});
+
+test('applySnapshot replaces every live market field and keeps the rest', () => {
+  const token = {
+    id: 'aave',
+    sources: { 'cg-coin': { ok: true } },
+    market: { price: 100, marketCap: 1e9, fdv: 2e9, change24h: 1, athDate: '2021-05-18', mcapToTvl: 0.1, sparkline7d: [1, 2], src: 'cg-coin' },
+    supply: { circulating: 1e7, src: 'cg-coin' },
+    series: { price: [[1_800_000_000 - 90 * DAY, 50]] },
+  };
+  const source = { name: 'CoinGecko', api: 'https://example.test/markets?ids=aave', fetchedAt: new Date(1_800_000_000 * 1000).toISOString(), ok: true };
+  const ok = applySnapshot(token, { id: 'aave', current_price: 101, market_cap: 1.01e9, fully_diluted_valuation: 2.02e9, total_volume: 5e7, price_change_percentage_24h_in_currency: -2, price_change_percentage_30d_in_currency: -29.4, price_change_percentage_1y_in_currency: -44, ath: 661, ath_change_percentage: -84.7 }, source, { page: 'https://www.coingecko.com/en/coins/aave' });
+  assert.equal(ok, true);
+  assert.equal(token.market.price, 101);
+  assert.equal(token.market.marketCap, 1.01e9);
+  assert.equal(token.market.fdv, 2.02e9);
+  assert.equal(token.market.change30d, -29.4);
+  assert.equal(token.market.change90d, 102, 'snapshot price vs the close 90 days before');
+  assert.equal(token.market.src, 'cg-snapshot');
+  assert.equal(token.market.asOf, source.fetchedAt);
+  assert.equal(token.market.mcapToTvl, undefined, 'ratios CoinGecko computed at another price are dropped');
+  assert.deepEqual(token.market.sparkline7d, [1, 2], 'fields the snapshot has no value for are kept');
+  assert.equal(token.sources['cg-snapshot'].page, 'https://www.coingecko.com/en/coins/aave');
+  assert.equal(token.supply.src, 'cg-coin', 'supply stays with the request it came from');
+  // no row, or a row without a price: nothing changes
+  const untouched = { id: 'x', sources: {}, market: { price: 5, src: 'dl-coin' } };
+  assert.equal(applySnapshot(untouched, undefined, source), false);
+  assert.equal(applySnapshot(untouched, { id: 'x', current_price: null }, source), false);
+  assert.equal(untouched.market.src, 'dl-coin');
+});
+
+test('coin list rows for tracked tokens take the snapshot numbers', () => {
+  const list = { ok: true, data: [{ id: 'btc', symbol: 'btc', name: 'Bitcoin', market_cap_rank: 1, current_price: 9, market_cap: 9e9 }, { id: 'aave', symbol: 'aave', name: 'Aave', market_cap_rank: 49, current_price: 113.51, market_cap: 1.7537e9 }] };
+  const snap = new Map([['aave', { id: 'aave', current_price: 113.46, market_cap: 1.7515e9, fully_diluted_valuation: 1.8149e9, total_volume: 2e8, price_change_percentage_7d_in_currency: -13.4 }]]);
+  const rows = buildCoinRows(list, { ok: false }, new Set(['aave']), snap);
+  const aave = rows.find((r) => r.id === 'aave');
+  assert.equal(aave.price, 113.46);
+  assert.equal(aave.mcap, 1.7515e9);
+  assert.equal(aave.snapshot, true);
+  assert.equal(aave.rank, 49, 'rank still comes from the list');
+  assert.equal(rows.find((r) => r.id === 'btc').price, 9);
+  assert.equal(buildCoinRows(list, { ok: false }, new Set(['aave']), null).find((r) => r.id === 'aave').price, 113.51, 'without a snapshot the list’s own number stands');
+});

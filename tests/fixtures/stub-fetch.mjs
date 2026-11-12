@@ -99,6 +99,11 @@ globalThis.fetch = async (url, opts = {}) => {
   if (u.includes('api.llama.fi/protocol/')) return json(protocolDetail(decodeURIComponent(u.split('/protocol/')[1])));
   if (u.includes('/summary/fees/') && u.includes('dailyHoldersRevenue')) return json({ message: 'no data' }, 404);
   if (u.includes('/summary/fees/')) return json({ total24h: 1e5, total7d: 7e5, total30d: 3e6, total1y: 3.6e7, totalAllTime: 9e7, change_1d: 3, totalDataChart: days(500, (ts, i) => [ts, 1e5 + i]) });
+  if (u.includes('coingecko.com/api/v3/coins/markets') && u.includes('ids=')) {
+    // the price snapshot: one row per tracked token CoinGecko knows (missing-coin isn't one)
+    const row = (id, price) => ({ id, symbol: id.slice(0, 3), name: `${id} coin`, current_price: price, market_cap: price * 1.5e7, fully_diluted_valuation: price * 1.6e7, market_cap_rank: 50, total_volume: 9e7, high_24h: price * 1.02, low_24h: price * 0.97, circulating_supply: 1.5e7, total_supply: 1.6e7, max_supply: 1.6e7, ath: 600, ath_change_percentage: -83.2, ath_date: '2021-05-18T00:00:00.000Z', last_updated: new Date().toISOString(), price_change_percentage_24h_in_currency: 1.5, price_change_percentage_7d_in_currency: -3.5, price_change_percentage_14d_in_currency: -4, price_change_percentage_30d_in_currency: 9, price_change_percentage_200d_in_currency: 20, price_change_percentage_1y_in_currency: 48 });
+    return json(decodeURIComponent(u.split('ids=')[1].split('&')[0]).split(',').filter((id) => id !== 'missing-coin').map((id) => row(id, id === 'alpha-token' ? 101 : 7)));
+  }
   if (u.includes('coingecko.com/api/v3/coins/markets')) {
     const c = (id, rank, extra = {}) => ({ id, symbol: id.slice(0, 3), name: `${id} coin`, market_cap_rank: rank, current_price: 10 * rank, market_cap: 1e10 / rank, fully_diluted_valuation: 2e10 / rank, total_volume: 1e8, price_change_percentage_24h_in_currency: 1, price_change_percentage_7d_in_currency: -2, price_change_percentage_30d_in_currency: 5, circulating_supply: 1e6, max_supply: null, ath_change_percentage: -40, ...extra });
     return json(u.includes('category=') ? [c('alpha-token', 50), c('defi-only', 400)] : [c('big-coin', 1), c('alpha-token', 50)]);

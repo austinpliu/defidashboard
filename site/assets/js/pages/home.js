@@ -109,7 +109,7 @@ export async function render(root) {
         h('span', {}, p.symbol ? `${p.symbol} price` : 'Token'), h('span', { class: 'v' }, p.price != null ? usd(p.price) : '—', ' ', p.price != null ? h('span', { class: `delta ${p.priceChange7d > 0 ? 'up' : p.priceChange7d < 0 ? 'down' : 'flat'}` }, pct(p.priceChange7d)) : null)),
       h('div', { class: 'w-spark' }, sparkline(p.tvlSpark, { height: 36 })),
     ));
-    const srcs = [watch[0]?.srcTvl ? { ...watch[0].srcTvl, label: 'TVL & fees (each protocol page links its own endpoint)', page: 'https://defillama.com/', api: null } : null, watch.find((p) => p.srcPrice)?.srcPrice ? { ...watch.find((p) => p.srcPrice).srcPrice, label: 'token prices', page: 'https://www.coingecko.com/', api: null } : null].filter(Boolean);
+    const srcs = [watch[0]?.srcTvl ? { ...watch[0].srcTvl, label: 'TVL & fees (each protocol page links its own endpoint)', page: 'https://defillama.com/', api: null } : null, idx.priceSnapshot ? { ...idx.priceSnapshot, label: 'token prices, one request for all tokens' } : watch.find((p) => p.srcPrice)?.srcPrice ? { ...watch.find((p) => p.srcPrice).srcPrice, label: 'token prices', page: 'https://www.coingecko.com/', api: null } : null].filter(Boolean);
     grid.append(h('div', { class: 'span-12' },
       subhead('Your watchlist', 'The protocols you follow', h('a', { href: '#/protocols', class: 'tool' }, 'All protocol details →')),
       h('div', { class: 'watch-grid' }, cards),
