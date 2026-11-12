@@ -30,9 +30,21 @@ function siteOf(url) {
   }
 }
 
-export function classify(title, baseType) {
-  if (baseType === 'governance-forum') return LAUNCH_RE.test(title) ? 'launch-upgrade' : 'governance-forum';
-  return LAUNCH_RE.test(title) ? 'launch-upgrade' : baseType;
+// Words in a title that suggest a change to what reaches token holders or to token supply.
+// Used only to tag items "token economics (keyword match)" so they can be filtered.
+const TOKENOMICS_RE = /\b(buy-?backs?|fee[- ]switch|burn(s|ed|ing)?|tokenomics|emissions?|revenue[- ]shar(e|ing)|fee[- ]shar(e|ing)|staking rewards?|vesting|unlock(s|ed|ing)?|token supply|treasury diversification)\b/i;
+
+/**
+ * "launch / upgrade" only when the launch is this protocol's: either the item comes from the
+ * protocol's own blog or forum, or the protocol is named in the headline itself. A headline about
+ * someone else's launch that merely mentions the protocol further down stays plain news.
+ */
+export function classify(title, baseType, { named = true } = {}) {
+  return LAUNCH_RE.test(title) && named ? 'launch-upgrade' : baseType;
+}
+
+export function topicsOf(title) {
+  return TOKENOMICS_RE.test(title || '') ? ['token-economics'] : [];
 }
 
 /**
@@ -46,16 +58,24 @@ export function feedItems({ items, feed, srcKey, protocols, maxAgeDays = 30, own
     if (!it.date || Date.parse(it.date) < cutoff) continue;
     if (!/^https?:\/\//i.test(it.link || '')) continue; // never pass on javascript: or other odd links
     const text = `${it.title} ${it.summary || ''}`;
-    let matched = protocols.filter((p) => mentions(text, p.keywords?.length ? p.keywords : [p.name]));
+    const kw = (p) => (p.keywords?.length ? p.keywords : [p.name]);
+    let matched = protocols.filter((p) => mentions(text, kw(p)));
+    // where each protocol was found: in the headline, or only in the summary below it
+    const inTitle = new Set(matched.filter((p) => mentions(it.title, kw(p))).map((p) => p.slug));
     if (ownerSlug) {
       const owner = protocols.find((p) => p.slug === ownerSlug);
       if (owner && !matched.includes(owner)) matched = [owner, ...matched];
+      if (owner) inTitle.add(owner.slug); // an item from a protocol's own feed is about that protocol
     }
     const baseType = feed.type || 'news';
+    const passing = matched.filter((p) => !inTitle.has(p.slug)).map((p) => p.slug);
     out.push({
       id: `${slugify(feed.name)}-${slugify(it.link).slice(-60)}`,
       date: it.date,
-      type: classify(it.title, baseType),
+      type: classify(it.title, baseType, { named: inTitle.size > 0 }),
+      // protocols named only in the summary, not the headline: the item mentions them in passing
+      passing,
+      topics: topicsOf(it.title),
       baseType,
       status: 'past',
       protocols: matched.map((p) => p.slug),

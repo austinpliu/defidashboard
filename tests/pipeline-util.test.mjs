@@ -516,3 +516,34 @@ test('feeComposition separates stablecoin issuers and chains from fees paid to a
   assert.deepEqual(feeComposition([{ name: 'A', category: 'Dexs', total30d: 10 }]).parts, [], 'nothing to flag when neither category is present');
   assert.equal(feeComposition([]), null);
 });
+
+// ---------- catalysts: whose launch is it, and what is it about ----------
+import { feedItems, topicsOf } from '../scripts/lib/feeds.mjs';
+
+test('a launch is only labelled as a protocol’s when the headline names it', () => {
+  const protocols = [{ slug: 'ondo-finance', name: 'Ondo Finance', symbol: 'ONDO', keywords: ['Ondo', 'ONDO'] }, { slug: 'ethena', name: 'Ethena', symbol: 'ENA', keywords: ['Ethena', 'ENA'] }];
+  const now = new Date().toUTCString();
+  const items = [
+    // seen live on 12 Nov 2026: tagged as an ONDO "launch / upgrade" because Ondo appeared in the summary
+    { title: 'Anthropic to Launch Nasdaq IPO Tuesday, IFR Reports', summary: 'Tokenized shares may trade on Ondo Global Markets.', link: 'https://news.example/a', date: now },
+    { title: 'Securitize and Ethena’s $100 million BlackRock BUIDL liquidity facility goes live', summary: '', link: 'https://news.example/b', date: now },
+    { title: 'Ondo proposes a fee switch and buyback for ONDO', summary: '', link: 'https://news.example/c', date: now },
+  ];
+  const out = feedItems({ items, feed: { name: 'News', type: 'news' }, srcKey: 'feed-news', protocols });
+  assert.equal(out[0].type, 'news', 'someone else’s launch that mentions the protocol in passing stays news');
+  assert.deepEqual(out[0].passing, ['ondo-finance']);
+  assert.deepEqual(out[0].protocols, ['ondo-finance'], 'it is still listed for the protocol, marked as a passing mention');
+  assert.equal(out[1].type, 'launch-upgrade', 'named in the headline: its launch');
+  assert.deepEqual(out[1].passing, []);
+  assert.equal(out[2].type, 'news');
+  assert.deepEqual(out[2].topics, ['token-economics']);
+  // a protocol's own forum or blog is about that protocol even when the title doesn't name it
+  const own = feedItems({ items: [{ title: 'Mainnet upgrade scheduled', summary: '', link: 'https://forum.example/x', date: now }], feed: { name: 'Ondo forum', type: 'governance-forum' }, srcKey: 'feed-forum', protocols, ownerSlug: 'ondo-finance' });
+  assert.equal(own[0].type, 'launch-upgrade');
+  assert.deepEqual(own[0].passing, []);
+});
+
+test('topicsOf tags titles about what reaches token holders, and nothing else', () => {
+  for (const t of ['[ARFC] Aave buyback programme renewal', 'Activate the fee switch on Base', 'MIP-021: SYRUP buy-backs', 'Reduce COMP emissions by 20%', 'Extend team vesting', 'Burn 5% of supply']) assert.deepEqual(topicsOf(t), ['token-economics'], t);
+  for (const t of ['Add new LLTVs on Morpho Midnight', 'Risk Stewards: cap changes on Aave V3', 'Onboard weETH as collateral', '']) assert.deepEqual(topicsOf(t), [], t);
+});

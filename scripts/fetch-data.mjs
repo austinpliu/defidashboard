@@ -17,7 +17,7 @@ import {
 import { fetchCoinRaw, buildToken, applyLlamaFallback, searchCoin, fetchPriceSnapshot, applySnapshot, CG } from './lib/coingecko.mjs';
 import { fetchNetworkMap, fetchTokenPools } from './lib/dex.mjs';
 import { spacesFromSources, fetchProposals } from './lib/governance.mjs';
-import { fetchFeed, feedItems } from './lib/feeds.mjs';
+import { fetchFeed, feedItems, topicsOf } from './lib/feeds.mjs';
 import { fetchCoinMarkets, buildCoinRows, fetchPredictionEvents, buildPredictionEvents, predictionProtocols } from './lib/markets.mjs';
 import { probeEmissionsRepo, EMISSIONS_REPO, loadManualUnlocks, buildTokenUnlocks } from './lib/unlocks.mjs';
 import { sourceRecord, derivedRecord, carryForward } from './lib/sources.mjs';
@@ -705,6 +705,7 @@ async function main() {
       symbols: owner ? [owner.entry.symbol].filter(Boolean) : [],
       group: owner?.entry.group,
       title: x.title,
+      topics: topicsOf(x.title),
       summary: summary.trim(),
       url: x.url,
       sourceName: `Snapshot · ${x.spaceName}`,
