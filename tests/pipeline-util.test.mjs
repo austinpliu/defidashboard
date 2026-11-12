@@ -361,3 +361,83 @@ test('every ratio has a "Calculated" source naming its inputs and formula', () =
   }
   assert.deepEqual(S['calc-mcap-holders'].from, ['cg-snapshot', 'dl-holders-revenue']);
 });
+
+// ---------- size measures and fee definitions ----------
+import { tokenizedAssets, openInterestFor, sizeMeasures, feeDefinitions, SIZE_KINDS } from '../scripts/lib/size.mjs';
+
+const POOLS = { ok: true, data: { data: [
+  { pool: 'a', project: 'ondo-yield-assets', symbol: 'USDY', chain: 'Ethereum', poolMeta: 'US Dollar Yield', tvlUsd: 1_291_795_477, apy: 3.75 },
+  { pool: 'b', project: 'ondo-yield-assets', symbol: 'OUSG', chain: 'XRPL', poolMeta: 'Short-term US Government Securities', tvlUsd: 185_723_996, apy: 3.78 },
+  { pool: 'c', project: 'ondo-yield-assets', symbol: 'USDY', chain: 'Noble', tvlUsd: 0 },
+  { pool: 'd', project: 'aave-v3', symbol: 'USDC', chain: 'Ethereum', tvlUsd: 5e9 },
+] } };
+
+test('tokenized assets: the protocol’s yield-list entries added up, with what is missing named', () => {
+  const t = tokenizedAssets(POOLS, new Set(['ondo-finance', 'ondo-yield-assets', 'ondo-global-markets']));
+  assert.equal(t.value, 1_291_795_477 + 185_723_996);
+  assert.equal(t.listings, 2, 'empty listings are not counted');
+  assert.deepEqual(t.projects.map((p) => p.project), ['ondo-yield-assets']);
+  assert.ok(t.projects[0].page.endsWith('/yields?project=ondo-yield-assets'), 'a page where the total can be checked by hand');
+  assert.deepEqual(t.notListed, ['ondo-finance', 'ondo-global-markets']);
+  assert.equal(t.top[0].symbol, 'USDY');
+  assert.equal(tokenizedAssets(POOLS, new Set(['centrifuge-protocol'])), null, 'no listings: no number');
+  assert.equal(tokenizedAssets({ ok: false, error: 'x' }, new Set(['ondo-yield-assets'])), null);
+});
+
+const OI = { ok: true, data: { protocols: [
+  { name: 'Hyperliquid Perps', slug: 'hyperliquid-perps', defillamaId: '5507', parentProtocol: 'parent#hyperliquid', total24h: 6_621_791_483, total7DaysAgo: 7_650_847_998, total30DaysAgo: 8_015_225_586 },
+  { name: 'trade[XYZ]', slug: 'trade[xyz]', defillamaId: '9', total24h: 4.48e9, total7DaysAgo: 4.45e9, total30DaysAgo: 3.7e9 },
+  { name: 'Ondo Perps', slug: 'ondo-perps', defillamaId: '7992', parentProtocol: 'parent#ondo-finance', total24h: 0 },
+] } };
+
+test('open interest: only the protocol’s own venues, with the change from 30 days ago', () => {
+  const o = openInterestFor(OI, { parentIds: new Set(['parent#hyperliquid']) });
+  assert.equal(o.value, 6_621_791_483);
+  assert.equal(o.change30d, -17.38);
+  assert.equal(o.change7d, -13.45);
+  assert.deepEqual(o.venues.map((v) => v.name), ['Hyperliquid Perps']);
+  assert.equal(openInterestFor(OI, { parentIds: new Set(['parent#ondo-finance']) }), null, 'a venue with no open interest is not a size measure');
+  assert.equal(openInterestFor(OI, { parentIds: new Set(['parent#aave']) }), null);
+  assert.equal(openInterestFor({ ok: false }, { parentIds: new Set(['parent#hyperliquid']) }), null);
+});
+
+test('size measures: the primary one follows the kind of protocol', () => {
+  const tok = tokenizedAssets(POOLS, new Set(['ondo-yield-assets']));
+  const oi = openInterestFor(OI, { parentIds: new Set(['parent#hyperliquid']) });
+  // an RWA issuer with no TVL is sized by what it has issued
+  const ondo = sizeMeasures({ category: 'RWA', tvl: { value: null, unavailable: 'DefiLlama reports no TVL history' }, borrowed: null, tokenized: tok, openInterest: null });
+  assert.equal(ondo.primary, 'tokenized');
+  assert.equal(ondo.measures[0].label, 'Tokenized assets');
+  assert.equal(ondo.measures[0].src, 'dl-yields');
+  // a perps exchange by open interest, with its TVL kept beside it
+  const hl = sizeMeasures({ category: 'Derivatives', tvl: { value: 7.7e9, change30d: -5 }, borrowed: 4.3e8, tokenized: null, openInterest: oi });
+  assert.equal(hl.primary, 'openInterest');
+  assert.deepEqual(hl.measures.map((m) => m.kind), ['openInterest', 'tvl', 'borrowed']);
+  // a lender by TVL, with loans outstanding beside it
+  const aave = sizeMeasures({ category: 'Lending', tvl: { value: 16e9, change30d: -11.2 }, borrowed: 11.7e9, tokenized: null, openInterest: null });
+  assert.equal(aave.primary, 'tvl');
+  assert.deepEqual(aave.measures.map((m) => [m.kind, m.value]), [['tvl', 16e9], ['borrowed', 11.7e9]]);
+  // nothing at all: no measure, and the reason is kept
+  const none = sizeMeasures({ category: 'RWA', tvl: { value: null, unavailable: 'no TVL history' }, borrowed: null, tokenized: null, openInterest: null });
+  assert.equal(none.primary, null);
+  assert.equal(none.unavailable, 'no TVL history');
+  assert.ok(Object.values(SIZE_KINDS).every((k) => k.what.length > 40), 'every measure says what it counts');
+});
+
+test('fee definitions are DefiLlama’s own words, largest sub-protocol first', () => {
+  const fees = { ok: true, data: { protocols: [
+    { name: 'Aave V2', slug: 'aave-v2', parentProtocol: 'parent#aave', total30d: 152_632, methodology: { Fees: 'v2 fees', Revenue: 'v2 revenue' } },
+    { name: 'Aave V3', slug: 'aave-v3', parentProtocol: 'parent#aave', total30d: 37_853_385, methodology: { Fees: 'Include borrow interest, flashloan fee, liquidation fee and penalty paid by borrowers.', Revenue: 'Amount of fees go to Aave treasury.', HoldersRevenue: ' Aave starts buy back AAVE tokens. ', Junk: 5 }, methodologyURL: 'https://github.com/DefiLlama/dimension-adapters/blob/master/fees/aave/index.ts' },
+    { name: 'Ondo Yield Assets', slug: 'ondo-yield-assets', parentProtocol: 'parent#ondo-finance', total30d: 7_737_562, methodology: { Fees: 'The daily yield earned by USDY and OUSG holders.' } },
+    { name: 'No Words', slug: 'x', parentProtocol: 'parent#aave', total30d: 9e9 },
+  ] } };
+  const d = feeDefinitions(fees, { parentIds: new Set(['parent#aave']) });
+  assert.deepEqual(d.map((x) => x.name), ['Aave V3', 'Aave V2'], 'sub-protocols without a published definition are left out');
+  assert.equal(d[0].methodology.Fees, 'Include borrow interest, flashloan fee, liquidation fee and penalty paid by borrowers.');
+  assert.equal(d[0].methodology.HoldersRevenue, 'Aave starts buy back AAVE tokens.');
+  assert.equal(d[0].methodology.Junk, undefined);
+  assert.equal(d[0].shareOfFees, 99.6);
+  assert.ok(d[0].methodologyUrl.startsWith('https://github.com/'));
+  assert.equal(feeDefinitions(fees, { parentIds: new Set(['parent#nothing']) }), null);
+  assert.equal(feeDefinitions({ ok: false }, { parentIds: new Set(['parent#aave']) }), null);
+});

@@ -23,6 +23,7 @@ import { probeEmissionsRepo, EMISSIONS_REPO, loadManualUnlocks, buildTokenUnlock
 import { sourceRecord, derivedRecord, carryForward } from './lib/sources.mjs';
 import { fetchWeeklyPrices, fundamentalsInputs } from './lib/fundamentals.mjs';
 import { valuationRatios, valuationSources } from './lib/valuation.mjs';
+import { tokenizedAssets, openInterestFor, sizeMeasures, feeDefinitions } from './lib/size.mjs';
 import { roundSmart, num, slugify, normSeries, dailySeries, trimDays, compactSeries } from './lib/util.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -186,6 +187,9 @@ async function main() {
   const protocolList = raw.protocols.ok ? raw.protocols.data : null;
   const fees30dById = new Map((raw.fees.ok ? raw.fees.data.protocols || [] : []).map((p) => [String(p.defillamaId ?? p.id), num(p.total30d)]));
   const yieldsSrc = sourceRecord({ name: 'DefiLlama', label: 'Yield pools', page: `${DL.site}/yields`, res: raw.pools });
+  const oiSrc = sourceRecord({ name: 'DefiLlama', label: 'Perps open interest (all venues)', page: `${DL.site}/open-interest`, res: raw.openInterest });
+  const defsSrc = sourceRecord({ name: 'DefiLlama', label: 'What DefiLlama counts as fees, revenue and holders revenue, per sub-protocol', page: `${DL.site}/fees`, res: raw.fees });
+  if (!raw.openInterest.ok) problem('warn', `DefiLlama open interest failed (${raw.openInterest.error}); perps venues fall back to TVL as their size measure this run`);
   const hacksSrc = sourceRecord({ name: 'DefiLlama', label: 'Hacks database', page: `${DL.site}/hacks`, res: raw.hacks, note: raw.hacks.ok ? undefined : 'DefiLlama lists /hacks as a Pro (paid) endpoint; the free host refused it.' });
 
   const protocols = await mapLimit(entries, 2, async (entry) => {
@@ -287,7 +291,10 @@ async function main() {
     doc.sources['dl-hacks'] = hacksSrc;
     doc.hacks = hacks ? { list: hacks, src: 'dl-hacks' } : { unavailable: hacksSrc.error, note: hacksSrc.note, src: 'dl-hacks' };
 
-    return { entry, doc, slugs };
+    // what the size measures and fee definitions are matched on (see step 8b)
+    const kidSlugs = new Set(kidsAll.map((k) => k.slug));
+    const rwaKidSlugs = new Set(kidsAll.filter((k) => k.category === 'RWA').map((k) => k.slug));
+    return { entry, doc, slugs, match: { parentIds, ids, slugs: new Set([slug, ...kidSlugs]) }, rwaKidSlugs };
   });
 
   // 3. Tokens (CoinGecko, spaced out to respect the keyless rate limit) -----
@@ -609,6 +616,49 @@ async function main() {
     ]);
   }
 
+  // 8b. A size measure that fits each kind of protocol, and DefiLlama's fee definitions -----
+  // Runs after the carry-forward above, so a stale TVL is still a TVL here.
+  for (const p of protocols) {
+    const doc = p.doc;
+    const category = doc.about?.category || null;
+    const prev = readJSON(join(OUT, 'protocols', `${doc.slug}.json`));
+    const fresh = (iso) => iso && Date.now() - Date.parse(iso) < 48 * 36e5;
+    // a measure whose source failed this run is kept from the last run for up to 48 hours, marked stale
+    const keep = (kind, src) => {
+      const old = prev?.size?.measures?.find((m) => m.kind === kind);
+      const at = old?.stale?.lastGoodAt || old?.asOf;
+      return old && fresh(at) ? { ...old, stale: { lastGoodAt: at, reason: src.error } } : null;
+    };
+    let tok = category === 'RWA' ? tokenizedAssets(raw.pools, p.slugs) : null;
+    if (tok) {
+      // only real-world-asset sub-protocols belong in "not listed" (a perps venue has nothing to tokenize)
+      tok.notListed = tok.notListed.filter((s) => p.rwaKidSlugs.has(s));
+      tok.asOf = yieldsSrc.fetchedAt;
+    }
+    const oi = openInterestFor(raw.openInterest, p.match);
+    if (oi) oi.asOf = oiSrc.fetchedAt;
+    const size = sizeMeasures({ category, tvl: doc.tvl, borrowed: doc.chainTvl?.borrowed, tokenized: tok, openInterest: oi });
+    for (const m of size.measures) {
+      if (m.kind === 'tokenized') m.asOf = tok.asOf;
+      if (m.kind === 'openInterest') m.asOf = oi.asOf;
+      if (m.kind === 'tvl' || m.kind === 'borrowed') m.asOf = doc.sources['dl-protocol']?.stale?.lastGoodAt || doc.sources['dl-protocol']?.fetchedAt || null;
+    }
+    const carried = [!raw.pools.ok && category === 'RWA' ? keep('tokenized', yieldsSrc) : null, !raw.openInterest.ok ? keep('openInterest', oiSrc) : null].filter(Boolean);
+    if (carried.length) {
+      const all = [...size.measures, ...carried];
+      const want = category === 'RWA' ? 'tokenized' : category === 'Derivatives' ? 'openInterest' : null;
+      const first = all.find((m) => m.kind === want) || all.find((m) => m.kind === size.primary) || all[0];
+      size.measures = [first, ...all.filter((m) => m !== first)];
+      size.primary = first.kind;
+      delete size.unavailable;
+    }
+    doc.size = size;
+    if (size.measures.some((m) => m.kind === 'openInterest')) doc.sources['dl-open-interest'] = oiSrc;
+    const defs = feeDefinitions(raw.fees, p.match);
+    doc.definitions = defs ? { list: defs, src: 'dl-fees-overview' } : { unavailable: raw.fees.ok ? 'DefiLlama publishes no fee definitions for this protocol.' : raw.fees.error, src: 'dl-fees-overview' };
+    doc.sources['dl-fees-overview'] = defsSrc;
+  }
+
   // 9. Catalysts ---------------------------------------------------------------
   const now = Date.now();
   const govWindowStart = Date.now() / 1000 - 45 * 86400;
@@ -747,6 +797,11 @@ async function main() {
       holdersRevenueNote: doc.holdersRevenue?.unavailable || null,
       // calculated ratios (formulas in each protocol file's sources): value ÷ (30-day total × 365 ÷ 30)
       valuation: Object.fromEntries(Object.entries(doc.derived || {}).map(([k, v]) => [k, v.value])),
+      // size in the measure that fits this kind of protocol (TVL, tokenized assets or open interest)
+      size: doc.size || null,
+      feesAre: doc.definitions?.list?.[0] ? { from: doc.definitions.list[0].name, shareOfFees: doc.definitions.list[0].shareOfFees, fees: doc.definitions.list[0].methodology.Fees || null, revenue: doc.definitions.list[0].methodology.Revenue || null, holders: doc.definitions.list[0].methodology.HoldersRevenue || null } : null,
+      sizeSources: { 'dl-protocol': doc.sources['dl-protocol'] || null, 'dl-yields': doc.sources['dl-yields'] || null, 'dl-open-interest': doc.sources['dl-open-interest'] || null },
+      srcDefinitions: doc.sources['dl-fees-overview'] || null,
       srcChart: token?.series?.src ? token.sources[token.series.src] || null : null,
       srcFees: doc.sources['dl-fees'] || null,
       srcRevenue: doc.sources['dl-revenue'] || null,

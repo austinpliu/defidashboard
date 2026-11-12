@@ -1,11 +1,15 @@
 // One-sentence explanations for every metric on the site, written for a smart
 // reader who is new to finance terms. Used by the hover tooltips and the Glossary page.
 export const GLOSSARY = {
-  tvl: { term: 'TVL (total value locked)', def: 'The dollar value of all the crypto that users have deposited into a protocol’s smart contracts right now.' },
+  tvl: { term: 'TVL (total value locked)', def: 'The dollar value of all the crypto that users have deposited into a protocol’s smart contracts right now. It suits lenders and vaults; it is blank for real-world-asset issuers and understates exchanges, which is why this site also shows other size measures.' },
+  sizeMeasure: { term: 'Size measure', def: 'How big a protocol is, in the measure that fits what it does: TVL for lenders and vaults, tokenized assets for real-world-asset issuers, open interest for perps exchanges. The measures count different things, so compare within one, not across them.' },
+  tokenizedAssets: { term: 'Tokenized assets', def: 'The dollar value of the tokens a real-world-asset issuer has outstanding (for example tokenized Treasury funds), added up from its listings in DefiLlama’s yields list; it is the amount issued, not deposits in a contract, and products without a listing aren’t counted.' },
+  openInterest: { term: 'Open interest', def: 'The dollar value of all perpetual-futures positions currently open on an exchange; it shows how much trading exposure the venue carries, and because positions are leveraged it can exceed the collateral behind them.' },
+  loansOutstanding: { term: 'Loans outstanding', def: 'What borrowers currently owe a lending protocol, which is the balance it earns interest on; DefiLlama leaves it out of TVL so the same coins aren’t counted twice.' },
   defiTvl: { term: 'Total DeFi TVL', def: 'The combined value of all assets deposited in every DeFi protocol DefiLlama tracks, across all blockchains.' },
   stablecoins: { term: 'Stablecoin supply', def: 'The total dollar value of all stablecoins in circulation — tokens designed to stay worth $1 (or another currency).' },
   dexVolume: { term: 'DEX volume', def: 'The dollar value of all trades made on decentralized exchanges, where people swap tokens directly from their own wallets.' },
-  fees: { term: 'Fees', def: 'Everything users paid to use a protocol (trading fees, interest, and so on), before it is split between the protocol and its liquidity providers.' },
+  fees: { term: 'Fees', def: 'Everything users paid to use a protocol (trading fees, interest, and so on), before it is split between the protocol and its liquidity providers. What counts differs by kind of protocol: for a lender it is all borrower interest, for a real-world-asset issuer it is the yield its token holders earn, for an exchange it is trading fees.' },
   revenue: { term: 'Revenue', def: 'The part of the fees that the protocol itself keeps (for its treasury or token holders), after paying liquidity providers.' },
   holdersRevenue: { term: 'Holders revenue', def: 'The part of a protocol’s revenue that reaches token holders, for example through buybacks, burns or payouts to stakers, as counted by DefiLlama.' },
   buyback: { term: 'Buyback', def: 'When a protocol uses its revenue to buy its own token on the market, which supports holders the way a company buying back shares does; the bought tokens are often burned or held.' },
@@ -37,7 +41,7 @@ export const GLOSSARY = {
   valuationMultiple: { term: 'Valuation multiple', def: 'A token’s value divided by a year of fees or revenue at the recent pace; it says how many years of that income the market is paying for, and is only comparable between protocols that earn in the same way.' },
   change90d: { term: '90-day change', def: 'How much the price moved against the daily closing price 90 days earlier; CoinGecko doesn’t publish this one, so the dashboard calculates it.' },
   priceSnapshot: { term: 'Price snapshot', def: 'The single request, made once per update, that every tracked token’s price, market cap and FDV come from, so a token shows the same numbers in every table.' },
-  mcapToTvl: { term: 'Market cap ÷ TVL', def: 'The token’s market value compared with the deposits the protocol holds; below 1 means the token is worth less than the money parked in it.' },
+  mcapToTvl: { term: 'Market cap ÷ TVL', def: 'The token’s market value compared with the deposits the protocol holds. TVL is not earnings: this ratio flatters lenders (large deposits, thin margins) and penalizes exchanges (small deposits, large fees), so use the revenue multiples to compare across kinds of protocol.' },
   apy: { term: 'APY', def: 'Annual percentage yield: the yearly return you would earn on a deposit if today’s rate stayed the same, including compounding.' },
   apyBase: { term: 'Base APY', def: 'The part of the yield that comes from the protocol’s actual business, like interest paid by borrowers or trading fees.' },
   apyReward: { term: 'Reward APY', def: 'The part of the yield paid in bonus tokens to attract deposits, which can shrink or stop at any time.' },

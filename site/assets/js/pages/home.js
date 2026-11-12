@@ -2,6 +2,7 @@
 import { h, openExternal, append, band, statTile, sparkline, sourceLine, subhead, segmented, extLink, pageError, term, unavailable } from '../ui.js';
 import { chartCard, infoCard } from '../cards.js';
 import { loadMany } from '../data.js';
+import { primaryOf } from '../size.js';
 import { lineChart, hbarChart, divergingChart, columnChart, stackedColumns, themeOf } from '../charts.js';
 import { usd, usdPrice, pct, dateTime, date, relative, shortDate, compact, monthYear } from '../format.js';
 import { trimDays, indexTo100, weeklySum, monthlyLast, valueAt, RANGES, rangeLabel, changeOver } from '../series.js';
@@ -104,7 +105,10 @@ export async function render(root) {
     const cards = watch.map((p) => h('a', { class: 'wcard acc-yellow', href: `#/protocol/${p.slug}` },
       h('div', { class: 'w-top' }, p.logo ? h('img', { src: p.logo, alt: '', loading: 'lazy', width: 26, height: 26, onerror: (e) => e.target.remove() }) : null, h('div', {}, h('div', { class: 'w-name' }, p.name), h('div', { class: 'w-sym' }, [p.symbol, p.category].filter(Boolean).join(' · ')))),
       h('div', { class: 'w-rows' },
-        h('span', {}, 'TVL'), h('span', { class: 'v' }, usd(p.tvl), ' ', h('span', { class: `delta ${p.tvlChange7d > 0 ? 'up' : p.tvlChange7d < 0 ? 'down' : 'flat'}` }, pct(p.tvlChange7d))),
+        // a protocol with no TVL (real-world-asset issuers) shows the measure that fits it, named
+        ...(p.tvl == null && primaryOf(p.size)
+          ? [h('span', { title: primaryOf(p.size).what }, primaryOf(p.size).label), h('span', { class: 'v' }, usd(primaryOf(p.size).value))]
+          : [h('span', {}, 'TVL'), h('span', { class: 'v' }, usd(p.tvl), ' ', h('span', { class: `delta ${p.tvlChange7d > 0 ? 'up' : p.tvlChange7d < 0 ? 'down' : 'flat'}` }, pct(p.tvlChange7d)))]),
         h('span', {}, 'Fees 30d'), h('span', { class: 'v' }, usd(p.fees30d)),
         h('span', {}, p.symbol ? `${p.symbol} price` : 'Token'), h('span', { class: 'v' }, p.price != null ? usdPrice(p.price) : '—', ' ', p.price != null ? h('span', { class: `delta ${p.priceChange7d > 0 ? 'up' : p.priceChange7d < 0 ? 'down' : 'flat'}` }, pct(p.priceChange7d)) : null)),
       h('div', { class: 'w-spark' }, sparkline(p.tvlSpark, { height: 36 })),
@@ -113,7 +117,7 @@ export async function render(root) {
     grid.append(h('div', { class: 'span-12' },
       subhead('Your watchlist', 'The protocols you follow', h('a', { href: '#/protocols', class: 'tool' }, 'All protocol details →')),
       h('div', { class: 'watch-grid' }, cards),
-      h('p', { class: 'src' }, 'Changes are 7-day. Sparkline: TVL over the last 30 days. '),
+      h('p', { class: 'src' }, 'Changes are 7-day. Sparkline: TVL over the last 30 days. Protocols without a TVL show tokenized assets or open interest instead (see Tokens › Size). '),
       sourceLine(srcs)));
   }
 

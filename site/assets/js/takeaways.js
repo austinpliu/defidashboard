@@ -306,3 +306,40 @@ export function tokenValuationTakeaway(rows, { basisLabel = 'Market cap' } = {})
   }
   return null;
 }
+
+// ---------- Size measures and definitions ----------
+
+/**
+ * Protocols are sized by different measures (TVL, tokenized assets, open interest), so the
+ * headline names the largest within each measure and never ranks across them.
+ * rows: [{ name, kind, label, value }].
+ */
+export function sizeTakeaway(rows) {
+  const ok = (rows || []).filter((r) => r.kind && isNum(r.value) && r.value > 0);
+  if (!ok.length) return null;
+  const order = ['tvl', 'tokenized', 'openInterest'];
+  const groups = order.map((k) => ok.filter((r) => r.kind === k).sort((a, b) => b.value - a.value)).filter((g) => g.length);
+  if (!groups.length) return null;
+  const say = (g) => `${g[0].name} by ${g[0].label === 'TVL' ? 'TVL' : g[0].label.toLowerCase()} (${usd(g[0].value)})`;
+  if (groups.length === 1) {
+    const g = groups[0];
+    return g.length > 1
+      ? { pre: `${g[0].name} is the largest tracked protocol by ${g[0].label === 'TVL' ? 'TVL' : g[0].label.toLowerCase()}, `, hl: `${usd(g[0].value)}`, post: `, ahead of ${g[1].name} (${usd(g[1].value)})` }
+      : { pre: `${g[0].name}: `, hl: `${usd(g[0].value)} of ${g[0].label === 'TVL' ? 'TVL' : g[0].label.toLowerCase()}`, post: '' };
+  }
+  return { pre: 'Three kinds of size, not one ranking. Largest of each: '.replace('Three', ['', 'One', 'Two', 'Three'][groups.length]), hl: say(groups[0]), post: `, ${groups.slice(1).map(say).join(', ')}` };
+}
+
+/** How much of a protocol's revenue DefiLlama counts as reaching token holders. */
+export function holdersTakeaway(name, symbol, revenue, holders) {
+  const r = revenue?.total30d;
+  const hr = holders?.total30d;
+  const who = symbol ? `${symbol} holders` : 'token holders';
+  if (!isNum(r)) return null;
+  if (r === 0) return { pre: `${name} records `, hl: 'no protocol revenue', post: `, so nothing reaches ${who}` };
+  if (!isNum(hr)) return { pre: 'DefiLlama has ', hl: 'no holders-revenue figure', post: ` for ${name}, so the share reaching ${who} is unknown` };
+  if (hr === 0) return { pre: '', hl: `None of ${name}’s revenue`, post: ` reaches ${who}, as DefiLlama counts it` };
+  const share = (hr / r) * 100;
+  if (share >= 99.5) return { pre: '', hl: `All of ${name}’s revenue`, post: ` reaches ${who}, as DefiLlama counts it` };
+  return { pre: '', hl: `${pct(share, { signed: false, digits: 0 })} of ${name}’s revenue`, post: ` reaches ${who}, as DefiLlama counts it` };
+}

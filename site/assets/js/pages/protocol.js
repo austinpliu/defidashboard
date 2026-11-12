@@ -7,11 +7,12 @@ import { dataTable } from '../table.js';
 import { usd, usdPrice, usdFull, pct, ratio, date, dateTime, relative, shortDate, compact, monthYear } from '../format.js';
 import { trimDays, rollingSum, RANGES, rangeLabel, changeOver } from '../series.js';
 import {
-  trendTakeaway, protocolChainTakeaway, revenueTakeaway, priceTakeaway, valuationTakeaway, supplyTakeaway, yieldTakeaway,
+  trendTakeaway, protocolChainTakeaway, revenueTakeaway, priceTakeaway, valuationTakeaway, supplyTakeaway, yieldTakeaway, holdersTakeaway,
 } from '../takeaways.js';
 import { unlocksBlock } from '../unlocks.js';
 import { notesCard } from '../notes/panel.js';
 import { checklistCard } from '../fundamentals/view.js';
+import { primaryOf, sizeTable, definitionsList, measureDetail, KIND_TERM } from '../size.js';
 
 export async function render(root, { params }) {
   const slug = params[0];
@@ -73,8 +74,12 @@ export async function render(root, { params }) {
   const mk = tk.market || {};
   const D = d.derived || {};
   const tokenSrc = S[mk.src] || S['cg-coin'];
+  const PM = primaryOf(d.size);
   const stats = h('div', { class: 'stats six', style: { marginTop: '18px' } },
-    statTile({ label: 'TVL', termKey: 'tvl', raw: T.value, value: usd(T.value), deltas: [{ v: T.change7d, per: '7d' }, { v: T.change30d, per: '30d' }], src: S[T.src], unavailableReason: T.unavailable }),
+    // no TVL (a real-world-asset issuer)? show the size measure that fits instead, by name
+    T.value == null && PM
+      ? statTile({ label: PM.label, termKey: KIND_TERM[PM.kind], raw: PM.value, value: usd(PM.value), deltas: PM.change30d != null ? [{ v: PM.change30d, per: '30d' }] : [], note: `Used in place of TVL. ${measureDetail(PM)}`.trim(), src: S[PM.src] })
+      : statTile({ label: 'TVL', termKey: 'tvl', raw: T.value, value: usd(T.value), deltas: [{ v: T.change7d, per: '7d' }, { v: T.change30d, per: '30d' }], src: S[T.src], unavailableReason: T.unavailable }),
     statTile({ label: 'Fees, 30 days', termKey: 'fees', raw: F.total30d, value: usd(F.total30d), deltas: [{ v: F.change30dOver30d, per: F.changesCalculated ? 'vs prior 30d (calc.)' : 'vs prior 30d' }], src: S[F.src], unavailableReason: F.unavailable }),
     statTile({ label: 'Revenue, 30 days', termKey: 'revenue', raw: R.total30d, value: usd(R.total30d), deltas: [{ v: R.change30dOver30d, per: R.changesCalculated ? 'vs prior 30d (calc.)' : 'vs prior 30d' }], src: S[R.src], unavailableReason: R.unavailable }),
     statTile({ label: sym ? `${sym} price` : 'Token price', termKey: 'price', raw: mk.price, value: usdPrice(mk.price), deltas: [{ v: mk.change24h, per: '24h' }, { v: mk.change7d, per: '7d' }], src: tokenSrc, unavailableReason: tk.unavailable || mk.partial }),
@@ -186,6 +191,24 @@ export async function render(root, { params }) {
     grid.append(h('div', { class: 'span-6' }, card));
   } else {
     grid.append(h('div', { class: 'span-6' }, chartCard({ kicker: 'Token', fallback: `${sym || name} price`, unavailableReason: ts?.unavailable || tk.unavailable || 'No token price history', src: S['cg-chart'], sources: S })));
+  }
+
+  // ---------- Size measures and what the fee figures mean here ----------
+  if (d.size?.measures?.length || d.definitions?.list?.length) {
+    grid.append(h('div', { class: 'span-12' }, infoCard({
+      kicker: 'Like for like',
+      take: holdersTakeaway(name, sym, R, d.holdersRevenue || {}),
+      fallback: `How to compare ${name} with other protocols`,
+      body: [
+        d.size?.measures?.length ? [h('p', { class: 'chart-title' }, term('Size', 'sizeMeasure'), `: ${name} measured every way the free data allows`), sizeTable(d.size, S)] : null,
+        h('p', { class: 'chart-note', style: { marginTop: '10px' } }, h('b', {}, 'Not like for like: '), 'these measures count different things, so compare a protocol with others sized the same way. The same goes for “fees”: what DefiLlama counts differs by kind of protocol, as its own definitions below show.'),
+        d.definitions?.list?.length
+          ? [h('p', { class: 'chart-title', style: { marginTop: '12px' } }, `What DefiLlama counts as fees, revenue and holders revenue for ${name}`), definitionsList(d.definitions)]
+          : null,
+      ],
+      src: [...new Set((d.size?.measures || []).map((m) => m.src))].map((k) => S[k]).concat(d.definitions?.list?.length ? [S['dl-fees-overview']] : []).filter(Boolean),
+      sources: S,
+    })));
   }
 
   // ---------- Valuation + supply ----------

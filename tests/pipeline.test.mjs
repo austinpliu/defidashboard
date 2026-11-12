@@ -80,6 +80,21 @@ test('pipeline writes every file with sources and handles failures honestly', ()
     assert.ok(idxA.srcChart.api.includes('market_chart'));
     assert.equal(alpha.sources['calc-mcap-holders'].derived, true);
 
+    // size measures: TVL stays primary for a lender, with loans outstanding and its perps venue's open interest beside it
+    assert.equal(alpha.size.primary, 'tvl');
+    assert.deepEqual(alpha.size.measures.map((m) => m.kind), ['tvl', 'borrowed', 'openInterest']);
+    const oi = alpha.size.measures.find((m) => m.kind === 'openInterest');
+    assert.equal(oi.value, 4e8, 'only this protocol’s venue, not every perps exchange');
+    assert.equal(oi.change30d, 25);
+    assert.ok(alpha.sources['dl-open-interest'].api.includes('/overview/open-interest'));
+    assert.ok(alpha.size.measures.every((m) => alpha.sources[m.src]?.fetchedAt), 'every size measure has a source and fetch time');
+    assert.equal(alpha.definitions.list[0].methodology.Fees, 'Interest paid by borrowers.', 'DefiLlama’s own definition, word for word');
+    assert.equal(alpha.definitions.list[0].name, 'Alpha V3');
+    assert.ok(alpha.sources['dl-fees-overview'].api.includes('/overview/fees'));
+    assert.equal(idxA.size.primary, 'tvl');
+    assert.equal(idxA.feesAre.fees, 'Interest paid by borrowers.');
+    assert.ok(idxA.sizeSources['dl-open-interest'].ok);
+
     const missing = read('tokens/missing-coin.json');
     assert.equal(missing.market.src, 'dl-coin', 'falls back to DefiLlama price when CoinGecko fails');
     assert.ok(missing.market.partial);

@@ -5,7 +5,8 @@ import { loadMany } from '../data.js';
 import { divergingChart } from '../charts.js';
 import { dataTable } from '../table.js';
 import { usd, usdPrice, pct, ratio } from '../format.js';
-import { priceMovesTakeaway, tokenValuationTakeaway } from '../takeaways.js';
+import { priceMovesTakeaway, tokenValuationTakeaway, sizeTakeaway } from '../takeaways.js';
+import { primaryOf, othersOf, measureLinks, measureDetail, KIND_TERM } from '../size.js';
 
 const isNum = (v) => typeof v === 'number' && Number.isFinite(v);
 const PERIODS = [
@@ -105,6 +106,17 @@ export async function render(root) {
   };
   renderValuation();
   const feeSrcs = rows.flatMap((r) => [[r.srcFees, 'fees'], [r.srcRevenue, 'revenue'], [r.srcHolders, 'holders revenue']].filter(([s]) => s).map(([s, what]) => ({ ...s, label: `${r.name}: ${what}, daily` })));
+  // what DefiLlama counts as fees for each protocol, in its own words (they differ a lot by type)
+  const withDefs = rows.filter((r) => r.feesAre?.fees);
+  const defsBlock = withDefs.length
+    ? h('details', { class: 'src-details', style: { margin: '10px 0' } },
+      h('summary', {}, `What “fees” and “revenue” mean for each of these ${withDefs.length} protocols, in DefiLlama’s words`),
+      h('ul', { class: 'summary-list' }, withDefs.map((r) => h('li', {},
+        h('b', {}, h('a', { href: `#/protocol/${r.slug}` }, r.name)), h('span', { class: 'sub' }, ` (${r.feesAre.from}${isNum(r.feesAre.shareOfFees) && r.feesAre.shareOfFees < 99.5 ? `, ${pct(r.feesAre.shareOfFees, { signed: false, digits: 0 })} of its fees` : ''})`),
+        h('div', {}, h('b', {}, 'Fees: '), r.feesAre.fees),
+        r.feesAre.revenue ? h('div', {}, h('b', {}, 'Revenue: '), r.feesAre.revenue) : null,
+        h('div', {}, h('b', {}, 'Holders revenue: '), r.feesAre.holders || h('span', { class: 'muted' }, 'DefiLlama publishes no definition for this sub-protocol.'))))))
+    : null;
   root.append(h('section', { class: 'card', style: { marginTop: '18px' } },
     h('div', { class: 'kicker' }, term('Valuation against earnings', 'valuationMultiple')),
     valHead,
@@ -112,7 +124,36 @@ export async function render(root) {
     h('p', { class: 'chart-note' }, 'Each multiple is the token’s value divided by a year at the last 30 days’ pace (30-day total × 365 ÷ 30): a run-rate, not a forecast. “No revenue” means DefiLlama records $0, so there is nothing to divide by; a dash means the figure is missing. '),
     h('p', { class: 'chart-note' }, h('b', {}, 'Not like for like: '), '“Fees” is everything users pay, and how much of it is the protocol’s differs by type. A lender’s fees are all the interest its borrowers pay, and most of that goes to depositors; an exchange’s fees are trading fees it largely keeps. The “Kept” column shows the difference. Compare tokens on revenue, or on holders revenue, before fees.'),
     valHolder,
-    sourceLine([...priceSrc, ...feeSrcs])));
+    defsBlock,
+    sourceLine([...priceSrc, ...feeSrcs, ...(rows.find((r) => r.srcDefinitions) ? [{ ...rows.find((r) => r.srcDefinitions).srcDefinitions }] : [])])));
+
+  // ---------- Size, in the measure that fits each protocol ----------
+  const sized = rows.map((r) => ({ ...r, P: primaryOf(r.size) }));
+  const kinds = [...new Set(sized.filter((r) => r.P).map((r) => r.P.label))];
+  root.append(h('section', { class: 'card', style: { marginTop: '18px' } },
+    h('div', { class: 'kicker' }, term('Size', 'sizeMeasure')),
+    takeaway(sizeTakeaway(sized.filter((r) => r.P).map((r) => ({ name: r.name, kind: r.P.kind, label: r.P.label, value: r.P.value }))), 'How big each protocol is, in the measure that fits it'),
+    h('p', { class: 'chart-note' }, h('b', {}, 'Not like for like: '), 'TVL counts deposits held in a protocol’s contracts. That fits lenders and vaults, but a real-world-asset issuer holds its assets off-chain (so its TVL is blank) and a perps exchange’s TVL is only the collateral bridged in. Each protocol is sized here by the measure that fits it, and the measures are not interchangeable: sort within one measure, and don’t divide a market cap by a mix of them.'),
+    dataTable({
+      caption: 'Protocol size', csvName: 'token-protocol-size', sortKey: 'sizeValue', pageSize: 50,
+      filters: [{ key: 'sizeLabel', label: 'Measure', plural: 'measures' }, { key: 'groupLabel', label: 'List', plural: 'lists' }],
+      searchKeys: ['symbol', 'name', 'category'],
+      rowClass: (r) => (r.group === 'watchlist' ? 'is-watch' : null),
+      columns: [
+        { key: 'symbol', label: 'Token', fmt: tokenCell },
+        { key: 'category', label: 'Category', termKey: 'category' },
+        { key: 'sizeLabel', label: 'Measure', fmt: (v, r) => (r.P ? term(r.P.label, KIND_TERM[r.P.kind]) : h('span', { class: 'muted', title: r.size?.unavailable || '' }, '—')) },
+        { key: 'sizeValue', label: 'Size', num: true, fmt: (v, r) => (r.P ? h('span', {}, usd(r.P.value), r.P.stale ? h('span', { class: 'sub' }, ' (stale)') : null) : '—') },
+        { key: 'size30d', label: '30d', num: true, fmt: (v) => (isNum(v) ? delta(v) : '—'), title: 'TVL and open interest: today against 30 days ago. Not available for tokenized assets (the yields list has no history).' },
+        { key: 'mcap', label: 'Market cap', num: true, fmt: (v) => usd(v), termKey: 'marketCap' },
+        { key: 'also', label: 'Also', wrap: true, fmt: (v, r) => (othersOf(r.size).length ? h('span', { class: 'sub' }, othersOf(r.size).map((m) => `${m.label} ${usd(m.value)}`).join(' · ')) : ''), csv: (r) => othersOf(r.size).map((m) => `${m.label} ${m.value}`).join('; ') },
+        { key: 'detail', label: 'What is counted', wrap: true, fmt: (v, r) => (r.P ? h('span', { class: 'sub' }, measureDetail(r.P) || r.P.what) : h('span', { class: 'sub' }, r.size?.unavailable || '')), csv: (r) => (r.P ? measureDetail(r.P) || r.P.what : r.size?.unavailable || '') },
+        { key: 'check', label: 'Check', wrap: true, fmt: (v, r) => (r.P ? measureLinks(r.P, r.sizeSources || {}) : ''), csv: (r) => (r.P ? r.sizeSources?.[r.P.src]?.api || '' : '') },
+      ],
+      rows: sized.map((r) => ({ ...r, sizeLabel: r.P?.label || null, sizeValue: r.P?.value ?? null, size30d: r.P?.change30d ?? null })),
+    }),
+    h('p', { class: 'chart-note' }, kinds.length ? `Measures in use: ${kinds.join(', ')}. ` : '', 'Tokenized assets come from DefiLlama’s yields list, because its dedicated real-world-asset dataset is on the paid plan; products with no listing there are named in “What is counted” and not included.'),
+    sourceLine(Object.values(Object.fromEntries(sized.flatMap((r) => (r.P && r.sizeSources?.[r.P.src] ? [[`${r.P.src}|${r.P.src === 'dl-protocol' ? r.slug : ''}`, { ...r.sizeSources[r.P.src], label: r.P.src === 'dl-protocol' ? `${r.name}: TVL` : r.sizeSources[r.P.src].label }]] : [])))))));
 
   // ---------- Price moves ----------
   let period = PERIODS[0];

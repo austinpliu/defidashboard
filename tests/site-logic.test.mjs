@@ -245,3 +245,28 @@ test('usdPrice keeps the cents a compact dollar figure would drop', () => {
   assert.equal(usdPrice(104250.4), '$104,250');
   assert.equal(usdPrice(null), '—');
 });
+
+// ---- Size measures and definitions ----
+import { sizeTakeaway, holdersTakeaway } from '../site/assets/js/takeaways.js';
+
+test('sizeTakeaway names the largest within each measure and never ranks across them', () => {
+  const rows = [
+    { name: 'Aave', kind: 'tvl', label: 'TVL', value: 16e9 }, { name: 'Morpho', kind: 'tvl', label: 'TVL', value: 10.9e9 },
+    { name: 'Ondo Finance', kind: 'tokenized', label: 'Tokenized assets', value: 2.43e9 }, { name: 'Centrifuge', kind: 'tokenized', label: 'Tokenized assets', value: 0.667e9 },
+    { name: 'Hyperliquid', kind: 'openInterest', label: 'Open interest', value: 6.6e9 }, { name: 'New', kind: null, value: null },
+  ];
+  assert.equal(text(sizeTakeaway(rows)), 'Three kinds of size, not one ranking. Largest of each: Aave by TVL ($16.0B), Ondo Finance by tokenized assets ($2.4B), Hyperliquid by open interest ($6.6B)');
+  assert.equal(text(sizeTakeaway(rows.slice(0, 3))), 'Two kinds of size, not one ranking. Largest of each: Aave by TVL ($16.0B), Ondo Finance by tokenized assets ($2.4B)');
+  assert.equal(text(sizeTakeaway(rows.slice(0, 2))), 'Aave is the largest tracked protocol by TVL, $16.0B, ahead of Morpho ($10.9B)');
+  assert.equal(text(sizeTakeaway(rows.slice(4, 5))), 'Hyperliquid: $6.6B of open interest');
+  assert.equal(sizeTakeaway([{ name: 'X', kind: null, value: null }]), null);
+});
+
+test('holdersTakeaway separates "none", "no data" and "no revenue"', () => {
+  assert.equal(text(holdersTakeaway('Sky', 'SKY', { total30d: 13_146_740 }, { total30d: 5_490_908 })), '42% of Sky’s revenue reaches SKY holders, as DefiLlama counts it');
+  assert.equal(text(holdersTakeaway('Hyperliquid', 'HYPE', { total30d: 68e6 }, { total30d: 68e6 })), 'All of Hyperliquid’s revenue reaches HYPE holders, as DefiLlama counts it');
+  assert.equal(text(holdersTakeaway('Aave', 'AAVE', { total30d: 5e6 }, { total30d: 0 })), 'None of Aave’s revenue reaches AAVE holders, as DefiLlama counts it');
+  assert.equal(text(holdersTakeaway('Ethena', 'ENA', { total30d: 62_046 }, { unavailable: 'HTTP 400' })), 'DefiLlama has no holders-revenue figure for Ethena, so the share reaching ENA holders is unknown');
+  assert.equal(text(holdersTakeaway('Ondo Finance', 'ONDO', { total30d: 0 }, { total30d: 0 })), 'Ondo Finance records no protocol revenue, so nothing reaches ONDO holders');
+  assert.equal(holdersTakeaway('X', 'X', { unavailable: 'x' }, {}), null);
+});

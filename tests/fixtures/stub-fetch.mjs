@@ -25,7 +25,7 @@ const overview = (scale) => ({
   total14dto7d: 6e7 * scale, total60dto30d: 2.8e8 * scale, change_1d: 2,
   totalDataChart: days(400, (ts, i) => [ts, 1e7 * scale * (1 + (i % 7) / 10)]),
   protocols: [
-    { name: 'Alpha V3', displayName: 'Alpha V3', defillamaId: '1', parentProtocol: 'parent#alpha', category: 'Lending', chains: ['Ethereum'], total24h: 1e6, total7d: 7e6, total30d: 3e7, total14dto7d: 6e6, total60dto30d: 2.9e7, slug: 'alpha-v3' },
+    { name: 'Alpha V3', displayName: 'Alpha V3', defillamaId: '1', parentProtocol: 'parent#alpha', category: 'Lending', chains: ['Ethereum'], total24h: 1e6, total7d: 7e6, total30d: 3e7, total14dto7d: 6e6, total60dto30d: 2.9e7, slug: 'alpha-v3', methodology: { Fees: 'Interest paid by borrowers.', Revenue: 'The share of interest kept by the treasury.', SupplySideRevenue: 'Interest paid to lenders.' }, methodologyURL: 'https://example.com/adapter.ts' },
     { name: 'Alpha V2', displayName: 'Alpha V2', defillamaId: '5', parentProtocol: 'parent#alpha', category: 'Lending', chains: ['Ethereum'], total24h: 1e5, total7d: 7e5, total30d: 3e6, slug: 'alpha-v2' },
     { name: 'Beta', displayName: 'Beta', defillamaId: '2', category: 'Dexs', chains: ['Ethereum'], total24h: 2e6, total7d: 1.4e7, total30d: 6e7, slug: 'beta' },
     { name: 'Ethereum', displayName: 'Ethereum', defillamaId: '9', category: 'Chain', total30d: 9e9 },
@@ -81,6 +81,10 @@ globalThis.fetch = async (url, opts = {}) => {
   if (u.endsWith('api.llama.fi/protocols')) return json(protocolsList);
   if (u.includes('/v2/chains')) return json([{ name: 'Ethereum', tvl: 6e10, tokenSymbol: 'ETH' }, { name: 'Solana', tvl: 9e9, tokenSymbol: 'SOL' }]);
   if (u.includes('/v2/historicalChainTvl')) return json(days(800, (ts, i) => ({ date: ts, tvl: 8e10 + i * 1e7 })));
+  if (u.includes('/overview/open-interest')) return json({ protocols: [
+    { name: 'Alpha Perps', displayName: 'Alpha Perps', defillamaId: '77', parentProtocol: 'parent#alpha', slug: 'alpha-perps', category: 'Derivatives', total24h: 4e8, total7DaysAgo: 5e8, total30DaysAgo: 3.2e8 },
+    { name: 'Someone Else Perps', defillamaId: '78', slug: 'other-perps', category: 'Derivatives', total24h: 9e9, total7DaysAgo: 9e9, total30DaysAgo: 9e9 },
+  ] });
   if (u.includes('/overview/fees') && u.includes('dailyRevenue')) return json(overview(0.4));
   if (u.includes('/overview/fees')) return json(overview(1));
   if (u.includes('/overview/dexs')) return json(overview(10));

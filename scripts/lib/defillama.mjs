@@ -120,7 +120,7 @@ const BRIDGE_CATEGORIES = new Set(['Bridge', 'Canonical Bridge']);
 export async function fetchGlobal(http) {
   const get = (url, label) => http.json(url, { label });
   const [
-    protocols, chains, totalTvl, fees, revenue, dexs, stables, stableChart, pools, hacks, raises, emissions,
+    protocols, chains, totalTvl, fees, revenue, dexs, stables, stableChart, pools, hacks, raises, emissions, openInterest,
   ] = await Promise.all([
     get(`${DL.api}/protocols`, 'DefiLlama protocol list'),
     get(`${DL.api}/v2/chains`, 'DefiLlama chain TVL'),
@@ -134,8 +134,10 @@ export async function fetchGlobal(http) {
     get(`${DL.api}/hacks`, 'DefiLlama hacks (may be Pro-only)'),
     get(`${DL.api}/raises`, 'DefiLlama raises (may be Pro-only)'),
     get(`${DL.api}/emissions`, 'DefiLlama token unlocks (may be Pro-only)'),
+    // free and documented; perps trading volume (/overview/derivatives) is paid-only
+    get(`${DL.api}/overview/open-interest?excludeTotalDataChart=true&excludeTotalDataChartBreakdown=true`, 'DefiLlama perps open interest'),
   ]);
-  return { protocols, chains, totalTvl, fees, revenue, dexs, stables, stableChart, pools, hacks, raises, emissions };
+  return { protocols, chains, totalTvl, fees, revenue, dexs, stables, stableChart, pools, hacks, raises, emissions, openInterest };
 }
 
 // ---------- Overview (fees / revenue / dex volume) ----------

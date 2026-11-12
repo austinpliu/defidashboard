@@ -6,6 +6,7 @@ import { hbarChart } from '../charts.js';
 import { dataTable } from '../table.js';
 import { usd, usdPrice, pct, ratio } from '../format.js';
 import { leaderTakeaway, compareTakeaway } from '../takeaways.js';
+import { sizeCell, primaryOf } from '../size.js';
 
 export async function render(root) {
   const files = await loadMany(['index.json']);
@@ -32,7 +33,8 @@ export async function render(root) {
     { key: 'groupLabel', label: 'List' },
     { key: 'category', label: 'Category' },
     { key: 'chains', label: 'Chains', fmt: (v) => h('span', { class: 'sub', title: (v || []).join(', ') }, `${(v || []).slice(0, 3).join(', ')}${(v || []).length > 3 ? ` +${v.length - 3}` : ''}`), sortValue: (r) => (r.chains || []).length },
-    { key: 'tvl', label: 'TVL', num: true, fmt: (v) => usd(v), termKey: 'tvl' },
+    // TVL where DefiLlama has one; otherwise the measure that fits (tokenized assets, open interest), labelled
+    { key: 'tvl', label: 'TVL / size', num: true, fmt: (v, r) => (v != null ? usd(v) : sizeCell(r.size, { always: true })), sortValue: (r) => r.tvl ?? primaryOf(r.size)?.value ?? null, csv: (r) => r.tvl ?? primaryOf(r.size)?.value ?? '', termKey: 'sizeMeasure', title: 'TVL, or for protocols without one the measure named beside the number' },
     { key: 'tvlChange7d', label: 'TVL 7d', num: true, fmt: (v) => h('span', { class: `delta ${v > 0 ? 'up' : v < 0 ? 'down' : 'flat'}` }, pct(v)), csv: (r) => r.tvlChange7d },
     { key: 'tvlChange30d', label: 'TVL 30d', num: true, fmt: (v) => h('span', { class: `delta ${v > 0 ? 'up' : v < 0 ? 'down' : 'flat'}` }, pct(v)), csv: (r) => r.tvlChange30d },
     { key: 'tvlSpark', label: '30d trend', fmt: (v) => h('div', { style: { width: '90px' } }, sparkline(v, { height: 22, fill: false })), sortValue: (r) => r.tvlChange30d, csv: () => '' },
