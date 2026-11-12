@@ -4,14 +4,15 @@ import { chartCard, infoCard } from '../cards.js';
 import { loadMany } from '../data.js';
 import { lineChart, hbarChart, themeOf } from '../charts.js';
 import { dataTable } from '../table.js';
-import { usd, usdFull, pct, ratio, date, dateTime, relative, shortDate, compact, monthYear } from '../format.js';
+import { usd, usdPrice, usdFull, pct, ratio, date, dateTime, relative, shortDate, compact, monthYear } from '../format.js';
 import { trimDays, rollingSum, RANGES, rangeLabel, changeOver } from '../series.js';
 import {
-  trendTakeaway, protocolChainTakeaway, revenueTakeaway, priceTakeaway, valuationTakeaway, supplyTakeaway, yieldTakeaway,
+  trendTakeaway, protocolChainTakeaway, revenueTakeaway, priceTakeaway, valuationTakeaway, supplyTakeaway, yieldTakeaway, holdersTakeaway,
 } from '../takeaways.js';
 import { unlocksBlock } from '../unlocks.js';
 import { notesCard } from '../notes/panel.js';
 import { checklistCard } from '../fundamentals/view.js';
+import { primaryOf, sizeTable, definitionsList, measureDetail, KIND_TERM } from '../size.js';
 
 export async function render(root, { params }) {
   const slug = params[0];
@@ -56,6 +57,7 @@ export async function render(root, { params }) {
         (a.chains || []).slice(0, 8).map((c) => h('span', { class: 'chip' }, c)),
         (a.chains || []).length > 8 ? h('span', { class: 'chip' }, `+${a.chains.length - 8} more`) : null))),
     a.description ? h('p', { class: 'p-desc' }, a.description) : unavailable('No description', a.unavailable || 'DefiLlama has no description for this protocol.'),
+    a.descriptionOf ? h('p', { class: 'chart-note' }, `DefiLlama gives ${name} the same description as ${a.descriptionOf.name}, one of its ${a.descriptionOf.of} sub-protocols, so the text above describes that product rather than all of ${name}.`) : null,
     d.token?.description && d.token.description !== a.description
       ? h('p', { class: 'p-desc', style: { fontSize: '14px', color: 'var(--ink-2)', marginTop: '8px' } }, h('b', {}, 'CoinGecko: '), d.token.description)
       : null,
@@ -73,11 +75,15 @@ export async function render(root, { params }) {
   const mk = tk.market || {};
   const D = d.derived || {};
   const tokenSrc = S[mk.src] || S['cg-coin'];
+  const PM = primaryOf(d.size);
   const stats = h('div', { class: 'stats six', style: { marginTop: '18px' } },
-    statTile({ label: 'TVL', termKey: 'tvl', raw: T.value, value: usd(T.value), deltas: [{ v: T.change7d, per: '7d' }, { v: T.change30d, per: '30d' }], src: S[T.src], unavailableReason: T.unavailable }),
+    // no TVL (a real-world-asset issuer)? show the size measure that fits instead, by name
+    T.value == null && PM
+      ? statTile({ label: PM.label, termKey: KIND_TERM[PM.kind], raw: PM.value, value: usd(PM.value), deltas: PM.change30d != null ? [{ v: PM.change30d, per: '30d' }] : [], note: `Used in place of TVL. ${measureDetail(PM)}`.trim(), src: S[PM.src] })
+      : statTile({ label: 'TVL', termKey: 'tvl', raw: T.value, value: usd(T.value), deltas: [{ v: T.change7d, per: '7d' }, { v: T.change30d, per: '30d' }], src: S[T.src], unavailableReason: T.unavailable }),
     statTile({ label: 'Fees, 30 days', termKey: 'fees', raw: F.total30d, value: usd(F.total30d), deltas: [{ v: F.change30dOver30d, per: F.changesCalculated ? 'vs prior 30d (calc.)' : 'vs prior 30d' }], src: S[F.src], unavailableReason: F.unavailable }),
     statTile({ label: 'Revenue, 30 days', termKey: 'revenue', raw: R.total30d, value: usd(R.total30d), deltas: [{ v: R.change30dOver30d, per: R.changesCalculated ? 'vs prior 30d (calc.)' : 'vs prior 30d' }], src: S[R.src], unavailableReason: R.unavailable }),
-    statTile({ label: sym ? `${sym} price` : 'Token price', termKey: 'price', raw: mk.price, value: usd(mk.price), deltas: [{ v: mk.change24h, per: '24h' }, { v: mk.change7d, per: '7d' }], src: tokenSrc, unavailableReason: tk.unavailable || mk.partial }),
+    statTile({ label: sym ? `${sym} price` : 'Token price', termKey: 'price', raw: mk.price, value: usdPrice(mk.price), deltas: [{ v: mk.change24h, per: '24h' }, { v: mk.change7d, per: '7d' }], src: tokenSrc, unavailableReason: tk.unavailable || mk.partial }),
     statTile({ label: 'Market cap', termKey: 'marketCap', raw: mk.marketCap, value: usd(mk.marketCap), note: mk.fdv ? `FDV ${usd(mk.fdv)}` : null, src: tokenSrc, unavailableReason: tk.unavailable || mk.partial || 'CoinGecko reports no market cap for this token' }),
     statTile({ label: 'Mcap ÷ annual fees', termKey: 'mcapToFees', raw: D.mcapToFees?.value, value: ratio(D.mcapToFees?.value), note: D.annualizedFees?.value ? `Annualized fees ${usd(D.annualizedFees.value)}` : null, src: S['calc-mcap-fees'], sources: S, unavailableReason: 'Needs both a market cap and 30-day fees' }),
   );
@@ -188,21 +194,49 @@ export async function render(root, { params }) {
     grid.append(h('div', { class: 'span-6' }, chartCard({ kicker: 'Token', fallback: `${sym || name} price`, unavailableReason: ts?.unavailable || tk.unavailable || 'No token price history', src: S['cg-chart'], sources: S })));
   }
 
+  // ---------- Size measures and what the fee figures mean here ----------
+  if (d.size?.measures?.length || d.definitions?.list?.length) {
+    grid.append(h('div', { class: 'span-12' }, infoCard({
+      kicker: 'Like for like',
+      take: holdersTakeaway(name, sym, R, d.holdersRevenue || {}),
+      fallback: `How to compare ${name} with other protocols`,
+      body: [
+        d.size?.measures?.length ? [h('p', { class: 'chart-title' }, term('Size', 'sizeMeasure'), `: ${name} measured every way the free data allows`), sizeTable(d.size, S)] : null,
+        h('p', { class: 'chart-note', style: { marginTop: '10px' } }, h('b', {}, 'Not like for like: '), 'these measures count different things, so compare a protocol with others sized the same way. The same goes for “fees”: what DefiLlama counts differs by kind of protocol, as its own definitions below show.'),
+        d.definitions?.list?.length
+          ? [h('p', { class: 'chart-title', style: { marginTop: '12px' } }, `What DefiLlama counts as fees, revenue and holders revenue for ${name}`), definitionsList(d.definitions)]
+          : null,
+      ],
+      src: [...new Set((d.size?.measures || []).map((m) => m.src))].map((k) => S[k]).concat(d.definitions?.list?.length ? [S['dl-fees-overview']] : []).filter(Boolean),
+      sources: S,
+    })));
+  }
+
   // ---------- Valuation + supply ----------
   const idx = files['index.json'].data;
-  const others = (idx?.protocols || []).filter((p) => p.slug !== slug && p.mcap && p.fees30d).map((p) => ({ name: p.name, value: p.mcap / ((p.fees30d * 365) / 30) }));
+  // every other tracked protocol's market cap ÷ annualized revenue (null where it has none)
+  const others = (idx?.protocols || []).filter((p) => p.slug !== slug).map((p) => ({ name: p.name, value: p.valuation?.mcapToRevenue ?? null }));
   const sup = tk.supply || {};
+  const HR = d.holdersRevenue || {};
+  const pctOrDash = (x) => (x?.value != null ? pct(x.value, { signed: false }) : '—');
+  // a multiple of zero revenue isn't a number: say so instead of leaving an unexplained dash
+  const mult = (x, total30, what) => (x?.value != null ? ratio(x.value) : total30 === 0 ? `no ${what}` : '—');
   const valRows = [
     ['Market cap', 'marketCap', usd(mk.marketCap), tokenSrc],
     ['Fully diluted value', 'fdv', usd(mk.fdv), tokenSrc],
+    ['Market cap as % of FDV', 'mcapToFdv', pctOrDash(D.mcapToFdv), S['calc-mcap-fdv']],
     ['Annualized fees', 'annualizedFees', usd(D.annualizedFees?.value), S['calc-annual-fees']],
     ['Annualized revenue', 'annualizedRevenue', usd(D.annualizedRevenue?.value), S['calc-annual-revenue']],
-    ['Market cap ÷ annualized fees', 'mcapToFees', ratio(D.mcapToFees?.value), S['calc-mcap-fees']],
-    ['Market cap ÷ annualized revenue', 'mcapToRevenue', ratio(D.mcapToRevenue?.value), S['calc-mcap-revenue']],
-    ['FDV ÷ annualized fees', 'fdvToFees', ratio(D.fdvToFees?.value), S['calc-fdv-fees']],
+    ['Annualized holders revenue', 'holdersRevenue', HR.unavailable ? '—' : usd(D.annualizedHoldersRevenue?.value), S['calc-annual-holders']],
+    ['Revenue as % of fees', 'revenueShare', pctOrDash(D.revenueShare), S['calc-revenue-share']],
+    ['Holders revenue as % of revenue', 'holdersShare', pctOrDash(D.holdersShare), S['calc-holders-share']],
+    ['Market cap ÷ annualized fees', 'mcapToFees', mult(D.mcapToFees, F.total30d, 'fees'), S['calc-mcap-fees']],
+    ['Market cap ÷ annualized revenue', 'mcapToRevenue', mult(D.mcapToRevenue, R.total30d, 'revenue'), S['calc-mcap-revenue']],
+    ['Market cap ÷ annualized holders revenue', 'mcapToHoldersRevenue', mult(D.mcapToHoldersRevenue, HR.total30d, 'holders revenue'), S['calc-mcap-holders']],
+    ['FDV ÷ annualized fees', 'fdvToFees', mult(D.fdvToFees, F.total30d, 'fees'), S['calc-fdv-fees']],
+    ['FDV ÷ annualized revenue', 'fdvToRevenue', mult(D.fdvToRevenue, R.total30d, 'revenue'), S['calc-fdv-revenue']],
     ['Market cap ÷ TVL', 'mcapToTvl', ratio(D.mcapToTvl?.value), S['calc-mcap-tvl']],
-    ['Revenue as % of fees', 'revenueShare', D.revenueShare?.value != null ? pct(D.revenueShare.value, { signed: false }) : '—', S['calc-revenue-share']],
-  ];
+  ].filter(([, , , src]) => src); // rows whose formula isn't in this data file yet are left out
   const valTable = h('div', { class: 'table-wrap' }, h('table', { class: 'data' },
     h('thead', {}, h('tr', {}, h('th', {}, 'Metric'), h('th', { class: 'n' }, 'Value'), h('th', {}, 'How'))),
     h('tbody', {}, valRows.map(([label, key, val, src]) => h('tr', {}, h('td', {}, term(label, key)), h('td', { class: 'n' }, val), h('td', { class: 'sub wrap' }, src?.derived ? src.formula : src ? extLink(src.page, src.name) : '—'))))));
@@ -221,7 +255,7 @@ export async function render(root, { params }) {
   const unl = d.unlocks || {};
   grid.append(h('div', { class: 'span-6' }, infoCard({
     kicker: 'Valuation & supply',
-    take: valuationTakeaway(sym || name, D.mcapToFees?.value, others) || supplyTakeaway(sym || name, sup),
+    take: valuationTakeaway(sym || name, { mcapToRevenue: D.mcapToRevenue?.value, mcapToFees: D.mcapToFees?.value, revenue30d: R.total30d }, others) || supplyTakeaway(sym || name, sup),
     fallback: `${sym || name} valuation and supply`,
     body: [
       valTable,
@@ -230,7 +264,7 @@ export async function render(root, { params }) {
         ? h('div', { style: { marginTop: '12px' } }, h('p', { class: 'chart-title' }, term('Upcoming unlocks', 'unlock')), unlocksBlock(unl, sym || name, { maxEvents: 4 }))
         : h('div', { style: { marginTop: '12px' } }, unavailable('Upcoming unlocks: unavailable', unl.unavailable || 'No unlock schedule in the data.')),
     ],
-    src: [tokenSrc, S['dl-fees']].filter(Boolean),
+    src: [tokenSrc, S['dl-fees'], S['dl-revenue'], S['dl-holders-revenue']].filter(Boolean),
     sources: S,
   })));
 
@@ -355,7 +389,12 @@ export async function render(root, { params }) {
   const news = d.news || [];
   grid.append(h('div', { class: 'span-6' }, infoCard({
     kicker: 'News & posts',
-    take: news.length ? { pre: '', hl: `${news.length} mention${news.length === 1 ? '' : 's'}`, post: ` of ${name} in recent news and posts` } : null,
+    // d.newsTotal counts every mention; the list below shows the latest 12
+    take: news.length ? (() => {
+      const total = d.newsTotal ?? news.length;
+      const days = d.newsSince ? Math.max(1, Math.ceil((Date.now() - Date.parse(d.newsSince)) / 864e5)) : null;
+      return { pre: '', hl: `${total} mention${total === 1 ? '' : 's'}`, post: ` of ${name} in news and posts${days ? ` over the last ${days} day${days === 1 ? '' : 's'}` : ''}${total > news.length ? `; the latest ${news.length} are listed` : ''}` };
+    })() : null,
     fallback: `${name} in the news`,
     body: news.length
       ? h('ul', { class: 'feed' }, news.map((i) => h('li', {}, h('div', { class: 'when' }, shortDate(i.date), h('br'), relative(i.date)), h('div', { class: 'what' }, extLink(i.url, i.title), h('div', { class: 'meta' }, h('span', {}, i.sourceName), h('span', { class: 'chip' }, i.type.replace('-', ' ')))))))

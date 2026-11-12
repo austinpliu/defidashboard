@@ -2,11 +2,11 @@
 // number formatting, takeaway headline rules, series math and CSV output.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { usd, pct, ratio, compact, date, relative, direction } from '../site/assets/js/format.js';
+import { usd, usdPrice, pct, ratio, compact, date, relative, direction } from '../site/assets/js/format.js';
 import {
   trendTakeaway, chainTakeaway, leaderTakeaway, stablecoinTakeaway, moversTakeaway, flowTakeaway, revenueTakeaway,
   valuationTakeaway, supplyTakeaway, liquidityTakeaway, yieldTakeaway, compareTakeaway, catalystTakeaway, priceTakeaway, seriesChange,
-  categoryTakeaway,
+  categoryTakeaway, priceMovesTakeaway, tokenValuationTakeaway, feesTotalTakeaway, headlinesTakeaway,
 } from '../site/assets/js/takeaways.js';
 import { trimDays, indexTo100, weeklySum, rollingSum, monthlyLast, valueAt, changeOver } from '../site/assets/js/series.js';
 import { toCSV } from '../site/assets/js/export.js';
@@ -76,7 +76,9 @@ test('chainTakeaway: majority share, or the fastest grower', () => {
 
 test('leaderTakeaway: multiple or plain lead, with a scope', () => {
   const t = leaderTakeaway([{ name: 'A', total30d: 300 }, { name: 'B', total30d: 100 }], { metric: 'fees', scope: 'tracked protocol' });
-  assert.equal(text(t), 'A earned 3.00x more fees than any other tracked protocol over the last 30 days');
+  assert.equal(text(t), 'A took in 3x the fees of the next-largest tracked protocol (B) over the last 30 days: $300');
+  assert.match(text(leaderTakeaway([{ name: 'Tether', total30d: 514e6 }, { name: 'Circle', total30d: 205e6 }])), /^Tether took in 2\.5x the fees of the next-largest protocol \(Circle\)/);
+  assert.match(text(leaderTakeaway([{ name: 'A', total30d: 300 }, { name: 'B', total30d: 100 }], { metric: 'revenue' })), /^A kept 3x the revenue/);
   assert.match(text(leaderTakeaway([{ name: 'A', total30d: 110 }, { name: 'B', total30d: 100 }])), /led all protocols/);
 });
 
@@ -101,11 +103,14 @@ test('revenueTakeaway: zero revenue is stated as such, not as "keeps 0%"', () =>
 });
 
 test('valuationTakeaway ranks against the other tracked protocols', () => {
-  const others = [{ value: 10 }, { value: 20 }];
-  assert.match(text(valuationTakeaway('AAA', 4, others)), /lowest multiple of the 3 protocols/);
-  assert.match(text(valuationTakeaway('AAA', 40, others)), /highest multiple/);
-  assert.equal(text(valuationTakeaway('AAA', 15, others)), 'AAA trades at 15.0× annualized fees');
-  assert.equal(valuationTakeaway('AAA', null, others), null);
+  const others = [{ value: 10 }, { value: 20 }, { value: null }];
+  assert.match(text(valuationTakeaway('AAA', { mcapToRevenue: 4 }, others)), /lowest multiple of the 3 tracked protocols with revenue/);
+  assert.match(text(valuationTakeaway('AAA', { mcapToRevenue: 40 }, others)), /highest multiple/);
+  assert.equal(text(valuationTakeaway('AAA', { mcapToRevenue: 15, mcapToFees: 3 }, others)), 'AAA’s market cap is 15.0× annualized revenue');
+  // a protocol that keeps no revenue: no revenue multiple, and the fee multiple comes with its caveat
+  assert.equal(text(valuationTakeaway('ONDO', { mcapToRevenue: null, mcapToFees: 18.2, revenue30d: 0 }, others)), 'ONDO has no revenue multiple: the protocol keeps none of its fees. Its market cap is 18.2× annualized fees, but those fees pass through to others');
+  assert.match(text(valuationTakeaway('X', { mcapToFees: 5, revenue30d: null }, others)), /5\.00× annualized fees \(no revenue figure/);
+  assert.equal(valuationTakeaway('AAA', {}, others), null);
 });
 
 test('supply, liquidity, yield and price takeaways', () => {
@@ -203,4 +208,107 @@ test('categoryTakeaway names the headline basis and handles ties', () => {
   assert.match(text(categoryTakeaway([{ category: 'Lending', share: 30.2 }, { category: 'Dexs', share: 29.8 }], { denominator: 'headline' })), /Lending and Dexs are DeFi's largest categories/);
   assert.match(text(categoryTakeaway([{ category: 'Lending', share: 70 }], { denominator: 'attributed' })), /of the TVL in these categories/);
   assert.equal(categoryTakeaway([]), null);
+});
+
+// ---- Tokens page headlines (Nov 2026 content audit) ----
+
+test('priceMovesTakeaway never calls the smallest loser the biggest', () => {
+  // the old rule printed "COMP lost the most this week" when COMP was the one that fell least
+  const allDown = [{ symbol: 'COMP', change: -0.9 }, { symbol: 'AAVE', change: -13.4 }, { symbol: 'ENA', change: -15.3 }];
+  assert.equal(text(priceMovesTakeaway(allDown)), 'All 3 tracked tokens fell over the past 7 days; ENA fell most (−15.3%), COMP least (−0.90%)');
+  const mixed = [{ symbol: 'COMP', change: 0.92 }, { symbol: 'AAVE', change: -13.4 }, { symbol: 'ENA', change: -15.3 }, { symbol: 'X', change: null }];
+  assert.equal(text(priceMovesTakeaway(mixed)), 'COMP rose most over the past 7 days (+0.92%); ENA fell most (−15.3%). 1 of 3 tracked tokens rose');
+  const allUp = [{ symbol: 'A', change: 4 }, { symbol: 'B', change: 9 }];
+  assert.equal(text(priceMovesTakeaway(allUp, 'the past 30 days')), 'All 2 tracked tokens rose over the past 30 days; B rose most (+9.0%), A least (+4.0%)');
+  // a flat token is neither a riser nor a faller
+  assert.equal(text(priceMovesTakeaway([{ symbol: 'A', change: 0 }, { symbol: 'B', change: -4 }])), 'No tracked token rose over the past 7 days; B fell most (−4.0%)');
+  // ties are named together, and there is nothing to say about one token or none
+  assert.match(text(priceMovesTakeaway([{ symbol: 'A', change: 5 }, { symbol: 'B', change: 5 }, { symbol: 'C', change: -1 }])), /^A and B rose most/);
+  assert.equal(priceMovesTakeaway([{ symbol: 'A', change: 5 }]), null);
+  assert.equal(priceMovesTakeaway([{ symbol: 'A', change: 0 }, { symbol: 'B', change: 0 }]), null);
+  assert.equal(priceMovesTakeaway([]), null);
+});
+
+test('tokenValuationTakeaway ranks only tokens that have revenue', () => {
+  const rows = [
+    { symbol: 'SKY', multiple: 8.5, revenue30d: 13e6 }, { symbol: 'HYPE', multiple: 20.5, revenue30d: 68e6 },
+    { symbol: 'ONDO', multiple: null, revenue30d: 0 }, { symbol: 'MORPHO', multiple: null, revenue30d: 0 }, { symbol: 'NEW', multiple: null, revenue30d: null },
+  ];
+  assert.equal(text(tokenValuationTakeaway(rows)), 'SKY has the lowest market cap ÷ revenue (8.50×) of the 2 tracked tokens with revenue; HYPE the highest (20.5×). 2 of the 5 record no protocol revenue, so they have no multiple');
+  assert.match(text(tokenValuationTakeaway(rows, { basisLabel: 'FDV' })), /lowest fdv ÷ revenue/);
+  assert.match(text(tokenValuationTakeaway([{ symbol: 'A', multiple: 8.501, revenue30d: 1 }, { symbol: 'B', multiple: 8.499, revenue30d: 1 }, { symbol: 'C', multiple: 30, revenue30d: 1 }])), /^A and B share the lowest|^B and A share the lowest/);
+  assert.match(text(tokenValuationTakeaway([{ symbol: 'A', multiple: 12, revenue30d: 1 }, { symbol: 'B', multiple: null, revenue30d: 0 }])), /^A is the only tracked token with a revenue multiple/);
+  assert.equal(tokenValuationTakeaway([{ symbol: 'B', multiple: null, revenue30d: 0 }]), null);
+  assert.equal(tokenValuationTakeaway([]), null);
+});
+
+test('usdPrice keeps the cents a compact dollar figure would drop', () => {
+  assert.equal(usd(114.25), '$114', 'the compact form is right for totals');
+  assert.equal(usdPrice(114.25), '$114.25', 'but a price needs its cents to be checked by hand');
+  assert.equal(usdPrice(72.1), '$72.10');
+  assert.equal(usdPrice(0.35521), '$0.3552');
+  assert.equal(usdPrice(104250.4), '$104,250');
+  assert.equal(usdPrice(null), '—');
+});
+
+// ---- Size measures and definitions ----
+import { sizeTakeaway, holdersTakeaway } from '../site/assets/js/takeaways.js';
+
+test('sizeTakeaway names the largest within each measure and never ranks across them', () => {
+  const rows = [
+    { name: 'Aave', kind: 'tvl', label: 'TVL', value: 16e9 }, { name: 'Morpho', kind: 'tvl', label: 'TVL', value: 10.9e9 },
+    { name: 'Ondo Finance', kind: 'tokenized', label: 'Tokenized assets', value: 2.43e9 }, { name: 'Centrifuge', kind: 'tokenized', label: 'Tokenized assets', value: 0.667e9 },
+    { name: 'Hyperliquid', kind: 'openInterest', label: 'Open interest', value: 6.6e9 }, { name: 'New', kind: null, value: null },
+  ];
+  assert.equal(text(sizeTakeaway(rows)), 'Three kinds of size, not one ranking. Largest of each: Aave by TVL ($16.0B), Ondo Finance by tokenized assets ($2.4B), Hyperliquid by open interest ($6.6B)');
+  assert.equal(text(sizeTakeaway(rows.slice(0, 3))), 'Two kinds of size, not one ranking. Largest of each: Aave by TVL ($16.0B), Ondo Finance by tokenized assets ($2.4B)');
+  assert.equal(text(sizeTakeaway(rows.slice(0, 2))), 'Aave is the largest tracked protocol by TVL, $16.0B, ahead of Morpho ($10.9B)');
+  assert.equal(text(sizeTakeaway(rows.slice(4, 5))), 'Hyperliquid: $6.6B of open interest');
+  assert.equal(sizeTakeaway([{ name: 'X', kind: null, value: null }]), null);
+});
+
+test('holdersTakeaway separates "none", "no data" and "no revenue"', () => {
+  assert.equal(text(holdersTakeaway('Sky', 'SKY', { total30d: 13_146_740 }, { total30d: 5_490_908 })), '42% of Sky’s revenue reaches SKY holders, as DefiLlama counts it');
+  assert.equal(text(holdersTakeaway('Hyperliquid', 'HYPE', { total30d: 68e6 }, { total30d: 68e6 })), 'All of Hyperliquid’s revenue reaches HYPE holders, as DefiLlama counts it');
+  assert.equal(text(holdersTakeaway('Aave', 'AAVE', { total30d: 5e6 }, { total30d: 0 })), 'None of Aave’s revenue reaches AAVE holders, as DefiLlama counts it');
+  assert.equal(text(holdersTakeaway('Ethena', 'ENA', { total30d: 62_046 }, { unavailable: 'HTTP 400' })), 'DefiLlama has no holders-revenue figure for Ethena, so the share reaching ENA holders is unknown');
+  assert.equal(text(holdersTakeaway('Ondo Finance', 'ONDO', { total30d: 0 }, { total30d: 0 })), 'Ondo Finance records no protocol revenue, so nothing reaches ONDO holders');
+  assert.equal(holdersTakeaway('X', 'X', { unavailable: 'x' }, {}), null);
+});
+
+// ---- Unlock overview headline ----
+import { unlockOverviewTakeaway } from '../site/assets/js/takeaways.js';
+
+test('unlockOverviewTakeaway counts what is known and never reads "unconfirmed" as "nothing"', () => {
+  const rows = [
+    { symbol: 'ENA', status: 'scheduled', pct12m: 4.2, unknown12m: 6, events12m: 12 },
+    { symbol: 'MORPHO', status: 'scheduled', pct12m: null, unknown12m: 0, events12m: 0 },
+    { symbol: 'ONDO', status: 'partial', pct12m: null, unknown12m: 1, events12m: 1 },
+    { symbol: 'PENDLE', status: 'none', pct12m: null, unknown12m: 0, events12m: 0 },
+    { symbol: 'AAVE', status: 'unconfirmed', pct12m: null, unknown12m: 0, events12m: 0 },
+    { symbol: 'HYPE', status: 'unconfirmed', pct12m: null, unknown12m: 0, events12m: 0 },
+  ];
+  assert.equal(text(unlockOverviewTakeaway(rows)), 'ENA has the most supply due to unlock in the next 12 months with a published amount: 4.2% of its circulating supply (plus tranches of unpublished size). 1 more has dated unlocks of unpublished size; 1 has nothing left to unlock; 2 of 6 publish no schedule that could be confirmed');
+  assert.equal(text(unlockOverviewTakeaway(rows.slice(4))), 'None of the tracked tokens publishes an unlock schedule that could be confirmed');
+  assert.match(text(unlockOverviewTakeaway(rows.slice(2))), /^No tracked token has a dated unlock of published size in the next 12 months\. 1 more has dated unlocks of unpublished size/);
+  assert.equal(unlockOverviewTakeaway([]), null);
+});
+
+// ---- Headlines that reported a cap or a mislabelled total ----
+
+test('feesTotalTakeaway says what the fee total is made of', () => {
+  const fees = { total30d: 2.198e9, composition: { parts: [{ key: 'Stablecoin Issuer', label: 'stablecoin issuers’ income on their reserves', total30d: 747e6, share: 31.8 }, { key: 'Chain', label: 'blockchains’ own transaction fees', total30d: 92e6, share: 3.9 }] } };
+  assert.equal(text(feesTotalTakeaway(fees)), 'Protocols and chains tracked by DefiLlama took in $2.2B of fees over the last 30 days; about 32% of it is stablecoin issuers’ income on their reserves');
+  assert.equal(text(feesTotalTakeaway({ total30d: 1e9, composition: { parts: [{ label: 'x', share: 4 }] } })), 'Protocols and chains tracked by DefiLlama took in $1.0B of fees over the last 30 days');
+  assert.equal(text(feesTotalTakeaway({ total30d: 1e9 })), 'Protocols and chains tracked by DefiLlama took in $1.0B of fees over the last 30 days');
+  assert.equal(feesTotalTakeaway({}), null);
+});
+
+test('headlinesTakeaway counts every match, not the number shown', () => {
+  const now = Date.parse('2026-11-12T20:00:00Z');
+  // the old headline always said "30 DeFi headlines in the last 3 weeks": 30 was the display cap
+  assert.equal(text(headlinesTakeaway({ total: 143, shown: 30, sinceTs: Date.parse('2026-10-23T08:00:00Z'), outlets: 5, now })), '143 DeFi headlines in the last 21 days from 5 outlets; the latest 30 are listed');
+  assert.equal(text(headlinesTakeaway({ total: 12, shown: 12, sinceTs: Date.parse('2026-11-10T20:00:00Z'), outlets: 3, now })), '12 DeFi headlines in the last 2 days from 3 outlets');
+  assert.equal(text(headlinesTakeaway({ total: 1, shown: 1, sinceTs: null, outlets: 1, now })), '1 DeFi headline from 1 outlet');
+  assert.equal(headlinesTakeaway({ total: 0 }), null);
 });

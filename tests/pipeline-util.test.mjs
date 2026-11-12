@@ -243,3 +243,307 @@ test('categoryBreakdown: falls back to category rules when DefiLlama sends no pe
   assert.equal(r3.basis.attributedShare, 150);
   assert.equal(r3.list.reduce((s, c) => s + c.share, 0), 100);
 });
+
+// ---------- one price snapshot per run ----------
+import { applySnapshot, changeVsSeries, snapshotUrl } from '../scripts/lib/coingecko.mjs';
+import { buildCoinRows } from '../scripts/lib/markets.mjs';
+
+test('the snapshot is one request that names every tracked token', () => {
+  const u = snapshotUrl(['aave', 'ondo-finance']);
+  assert.ok(u.includes('/coins/markets?'));
+  assert.ok(u.includes('ids=aave,ondo-finance'));
+  assert.ok(u.includes('price_change_percentage=24h,7d,14d,30d,200d,1y'));
+});
+
+test('changeVsSeries compares the snapshot price with the daily close N days earlier', () => {
+  const now = 1_800_000_000;
+  const hist = Array.from({ length: 120 }, (_, i) => [now - (119 - i) * DAY, 100 + i]);
+  // 90 days before `now` is index 29 → 129
+  assert.equal(changeVsSeries(258, hist, 90, now), 100);
+  assert.equal(changeVsSeries(258, hist, 500, now), null, 'no history that far back: no number');
+  assert.equal(changeVsSeries(null, hist, 90, now), null);
+  assert.equal(changeVsSeries(258, [], 90, now), null);
+  // a gap around the target date is not bridged
+  const gappy = hist.filter(([t]) => t < now - 100 * DAY || t > now - 80 * DAY);
+  assert.equal(changeVsSeries(258, gappy, 90, now), null);
+});
+
+test('applySnapshot replaces every live market field and keeps the rest', () => {
+  const token = {
+    id: 'aave',
+    sources: { 'cg-coin': { ok: true } },
+    market: { price: 100, marketCap: 1e9, fdv: 2e9, change24h: 1, athDate: '2021-05-18', mcapToTvl: 0.1, sparkline7d: [1, 2], src: 'cg-coin' },
+    supply: { circulating: 1e7, src: 'cg-coin' },
+    series: { price: [[1_800_000_000 - 90 * DAY, 50]] },
+  };
+  const source = { name: 'CoinGecko', api: 'https://example.test/markets?ids=aave', fetchedAt: new Date(1_800_000_000 * 1000).toISOString(), ok: true };
+  const ok = applySnapshot(token, { id: 'aave', current_price: 101, market_cap: 1.01e9, fully_diluted_valuation: 2.02e9, total_volume: 5e7, price_change_percentage_24h_in_currency: -2, price_change_percentage_30d_in_currency: -29.4, price_change_percentage_1y_in_currency: -44, ath: 661, ath_change_percentage: -84.7 }, source, { page: 'https://www.coingecko.com/en/coins/aave' });
+  assert.equal(ok, true);
+  assert.equal(token.market.price, 101);
+  assert.equal(token.market.marketCap, 1.01e9);
+  assert.equal(token.market.fdv, 2.02e9);
+  assert.equal(token.market.change30d, -29.4);
+  assert.equal(token.market.change90d, 102, 'snapshot price vs the close 90 days before');
+  assert.equal(token.market.src, 'cg-snapshot');
+  assert.equal(token.market.asOf, source.fetchedAt);
+  assert.equal(token.market.mcapToTvl, undefined, 'ratios CoinGecko computed at another price are dropped');
+  assert.deepEqual(token.market.sparkline7d, [1, 2], 'fields the snapshot has no value for are kept');
+  assert.equal(token.sources['cg-snapshot'].page, 'https://www.coingecko.com/en/coins/aave');
+  assert.equal(token.supply.src, 'cg-coin', 'supply stays with the request it came from');
+  // no row, or a row without a price: nothing changes
+  const untouched = { id: 'x', sources: {}, market: { price: 5, src: 'dl-coin' } };
+  assert.equal(applySnapshot(untouched, undefined, source), false);
+  assert.equal(applySnapshot(untouched, { id: 'x', current_price: null }, source), false);
+  assert.equal(untouched.market.src, 'dl-coin');
+});
+
+test('coin list rows for tracked tokens take the snapshot numbers', () => {
+  const list = { ok: true, data: [{ id: 'btc', symbol: 'btc', name: 'Bitcoin', market_cap_rank: 1, current_price: 9, market_cap: 9e9 }, { id: 'aave', symbol: 'aave', name: 'Aave', market_cap_rank: 49, current_price: 113.51, market_cap: 1.7537e9 }] };
+  const snap = new Map([['aave', { id: 'aave', current_price: 113.46, market_cap: 1.7515e9, fully_diluted_valuation: 1.8149e9, total_volume: 2e8, price_change_percentage_7d_in_currency: -13.4 }]]);
+  const rows = buildCoinRows(list, { ok: false }, new Set(['aave']), snap);
+  const aave = rows.find((r) => r.id === 'aave');
+  assert.equal(aave.price, 113.46);
+  assert.equal(aave.mcap, 1.7515e9);
+  assert.equal(aave.snapshot, true);
+  assert.equal(aave.rank, 49, 'rank still comes from the list');
+  assert.equal(rows.find((r) => r.id === 'btc').price, 9);
+  assert.equal(buildCoinRows(list, { ok: false }, new Set(['aave']), null).find((r) => r.id === 'aave').price, 113.51, 'without a snapshot the list’s own number stands');
+});
+
+// ---------- valuation ratios ----------
+import { valuationRatios, valuationSources, annualize, ratioOf, shareOf } from '../scripts/lib/valuation.mjs';
+
+test('valuation ratios: value ÷ a year at the last 30 days’ pace', () => {
+  // Hyperliquid, 12 Nov 2026: market cap $17.14B, 30-day revenue $68.82M → 20.47×
+  const v = valuationRatios({ fees30: 89_581_591, rev30: 68_824_519, hold30: 68_824_519, mcap: 17_139_842_417, fdv: 68_123_441_241, tvl: 7_712_889_420 });
+  assert.equal(v.mcapToRevenue.value, 20.47);
+  assert.equal(v.mcapToFees.value, 15.73);
+  assert.equal(v.mcapToHoldersRevenue.value, 20.47);
+  assert.equal(v.fdvToRevenue.value, 81.35);
+  assert.equal(v.revenueShare.value, 76.83);
+  assert.equal(v.holdersShare.value, 100);
+  assert.equal(v.mcapToFdv.value, 25.16);
+  assert.equal(v.annualizedRevenue.value, Math.round((68_824_519 * 365) / 30));
+  assert.equal(v.mcapToRevenue.src, 'calc-mcap-revenue');
+});
+
+test('valuation ratios: no revenue or no data gives no multiple, never a made-up one', () => {
+  // Ondo: fees are holders' yield, revenue is $0
+  const ondo = valuationRatios({ fees30: 7_737_562, rev30: 0, hold30: 0, mcap: 1.7e9, fdv: 3.5e9, tvl: null });
+  assert.equal(ondo.mcapToRevenue.value, null);
+  assert.equal(ondo.mcapToHoldersRevenue.value, null);
+  assert.equal(ondo.fdvToRevenue.value, null);
+  assert.equal(ondo.revenueShare.value, 0);
+  assert.equal(ondo.holdersShare.value, null, 'a share of zero revenue is undefined');
+  assert.equal(ondo.mcapToTvl.value, null);
+  assert.equal(ondo.annualizedRevenue.value, 0);
+  // Ethena: DefiLlama has no holders-revenue data at all
+  const ena = valuationRatios({ fees30: 17e6, rev30: 62_046, hold30: undefined, mcap: 1.9e9, fdv: 2.1e9, tvl: 5e9 });
+  assert.equal(ena.annualizedHoldersRevenue.value, null);
+  assert.equal(ena.mcapToHoldersRevenue.value, null);
+  assert.ok(ena.mcapToRevenue.value > 2000, 'a tiny revenue gives a huge multiple, shown as it is');
+  // no token
+  const none = valuationRatios({ fees30: 1e6, rev30: 1e5, hold30: 0, mcap: null, fdv: null, tvl: 1e9 });
+  assert.equal(none.mcapToFees.value, null);
+  assert.equal(none.mcapToFdv.value, null);
+  assert.equal(annualize(null), null);
+  assert.equal(ratioOf(10, -1), null, 'negative revenue gives no multiple');
+  assert.equal(shareOf(1, 0), null);
+});
+
+test('every ratio has a "Calculated" source naming its inputs and formula', () => {
+  const v = valuationRatios({ fees30: 1, rev30: 1, hold30: 1, mcap: 1, fdv: 1, tvl: 1 });
+  const S = valuationSources('cg-snapshot');
+  for (const [k, x] of Object.entries(v)) {
+    assert.ok(S[x.src], `${k} → ${x.src}`);
+    assert.equal(S[x.src].derived, true);
+    assert.ok(S[x.src].formula.length > 10);
+  }
+  assert.deepEqual(S['calc-mcap-holders'].from, ['cg-snapshot', 'dl-holders-revenue']);
+});
+
+// ---------- size measures and fee definitions ----------
+import { tokenizedAssets, openInterestFor, sizeMeasures, feeDefinitions, SIZE_KINDS } from '../scripts/lib/size.mjs';
+
+const POOLS = { ok: true, data: { data: [
+  { pool: 'a', project: 'ondo-yield-assets', symbol: 'USDY', chain: 'Ethereum', poolMeta: 'US Dollar Yield', tvlUsd: 1_291_795_477, apy: 3.75 },
+  { pool: 'b', project: 'ondo-yield-assets', symbol: 'OUSG', chain: 'XRPL', poolMeta: 'Short-term US Government Securities', tvlUsd: 185_723_996, apy: 3.78 },
+  { pool: 'c', project: 'ondo-yield-assets', symbol: 'USDY', chain: 'Noble', tvlUsd: 0 },
+  { pool: 'd', project: 'aave-v3', symbol: 'USDC', chain: 'Ethereum', tvlUsd: 5e9 },
+] } };
+
+test('tokenized assets: the protocol’s yield-list entries added up, with what is missing named', () => {
+  const t = tokenizedAssets(POOLS, new Set(['ondo-finance', 'ondo-yield-assets', 'ondo-global-markets']));
+  assert.equal(t.value, 1_291_795_477 + 185_723_996);
+  assert.equal(t.listings, 2, 'empty listings are not counted');
+  assert.deepEqual(t.projects.map((p) => p.project), ['ondo-yield-assets']);
+  assert.ok(t.projects[0].page.endsWith('/yields?project=ondo-yield-assets'), 'a page where the total can be checked by hand');
+  assert.deepEqual(t.notListed, ['ondo-finance', 'ondo-global-markets']);
+  assert.equal(t.top[0].symbol, 'USDY');
+  assert.equal(tokenizedAssets(POOLS, new Set(['centrifuge-protocol'])), null, 'no listings: no number');
+  assert.equal(tokenizedAssets({ ok: false, error: 'x' }, new Set(['ondo-yield-assets'])), null);
+});
+
+const OI = { ok: true, data: { protocols: [
+  { name: 'Hyperliquid Perps', slug: 'hyperliquid-perps', defillamaId: '5507', parentProtocol: 'parent#hyperliquid', total24h: 6_621_791_483, total7DaysAgo: 7_650_847_998, total30DaysAgo: 8_015_225_586 },
+  { name: 'trade[XYZ]', slug: 'trade[xyz]', defillamaId: '9', total24h: 4.48e9, total7DaysAgo: 4.45e9, total30DaysAgo: 3.7e9 },
+  { name: 'Ondo Perps', slug: 'ondo-perps', defillamaId: '7992', parentProtocol: 'parent#ondo-finance', total24h: 0 },
+] } };
+
+test('open interest: only the protocol’s own venues, with the change from 30 days ago', () => {
+  const o = openInterestFor(OI, { parentIds: new Set(['parent#hyperliquid']) });
+  assert.equal(o.value, 6_621_791_483);
+  assert.equal(o.change30d, -17.38);
+  assert.equal(o.change7d, -13.45);
+  assert.deepEqual(o.venues.map((v) => v.name), ['Hyperliquid Perps']);
+  assert.equal(openInterestFor(OI, { parentIds: new Set(['parent#ondo-finance']) }), null, 'a venue with no open interest is not a size measure');
+  assert.equal(openInterestFor(OI, { parentIds: new Set(['parent#aave']) }), null);
+  assert.equal(openInterestFor({ ok: false }, { parentIds: new Set(['parent#hyperliquid']) }), null);
+});
+
+test('size measures: the primary one follows the kind of protocol', () => {
+  const tok = tokenizedAssets(POOLS, new Set(['ondo-yield-assets']));
+  const oi = openInterestFor(OI, { parentIds: new Set(['parent#hyperliquid']) });
+  // an RWA issuer with no TVL is sized by what it has issued
+  const ondo = sizeMeasures({ category: 'RWA', tvl: { value: null, unavailable: 'DefiLlama reports no TVL history' }, borrowed: null, tokenized: tok, openInterest: null });
+  assert.equal(ondo.primary, 'tokenized');
+  assert.equal(ondo.measures[0].label, 'Tokenized assets');
+  assert.equal(ondo.measures[0].src, 'dl-yields');
+  // a perps exchange by open interest, with its TVL kept beside it
+  const hl = sizeMeasures({ category: 'Derivatives', tvl: { value: 7.7e9, change30d: -5 }, borrowed: 4.3e8, tokenized: null, openInterest: oi });
+  assert.equal(hl.primary, 'openInterest');
+  assert.deepEqual(hl.measures.map((m) => m.kind), ['openInterest', 'tvl', 'borrowed']);
+  // a lender by TVL, with loans outstanding beside it
+  const aave = sizeMeasures({ category: 'Lending', tvl: { value: 16e9, change30d: -11.2 }, borrowed: 11.7e9, tokenized: null, openInterest: null });
+  assert.equal(aave.primary, 'tvl');
+  assert.deepEqual(aave.measures.map((m) => [m.kind, m.value]), [['tvl', 16e9], ['borrowed', 11.7e9]]);
+  // nothing at all: no measure, and the reason is kept
+  const none = sizeMeasures({ category: 'RWA', tvl: { value: null, unavailable: 'no TVL history' }, borrowed: null, tokenized: null, openInterest: null });
+  assert.equal(none.primary, null);
+  assert.equal(none.unavailable, 'no TVL history');
+  assert.ok(Object.values(SIZE_KINDS).every((k) => k.what.length > 40), 'every measure says what it counts');
+});
+
+test('fee definitions are DefiLlama’s own words, largest sub-protocol first', () => {
+  const fees = { ok: true, data: { protocols: [
+    { name: 'Aave V2', slug: 'aave-v2', parentProtocol: 'parent#aave', total30d: 152_632, methodology: { Fees: 'v2 fees', Revenue: 'v2 revenue' } },
+    { name: 'Aave V3', slug: 'aave-v3', parentProtocol: 'parent#aave', total30d: 37_853_385, methodology: { Fees: 'Include borrow interest, flashloan fee, liquidation fee and penalty paid by borrowers.', Revenue: 'Amount of fees go to Aave treasury.', HoldersRevenue: ' Aave starts buy back AAVE tokens. ', Junk: 5 }, methodologyURL: 'https://github.com/DefiLlama/dimension-adapters/blob/master/fees/aave/index.ts' },
+    { name: 'Ondo Yield Assets', slug: 'ondo-yield-assets', parentProtocol: 'parent#ondo-finance', total30d: 7_737_562, methodology: { Fees: 'The daily yield earned by USDY and OUSG holders.' } },
+    { name: 'No Words', slug: 'x', parentProtocol: 'parent#aave', total30d: 9e9 },
+  ] } };
+  const d = feeDefinitions(fees, { parentIds: new Set(['parent#aave']) });
+  assert.deepEqual(d.map((x) => x.name), ['Aave V3', 'Aave V2'], 'sub-protocols without a published definition are left out');
+  assert.equal(d[0].methodology.Fees, 'Include borrow interest, flashloan fee, liquidation fee and penalty paid by borrowers.');
+  assert.equal(d[0].methodology.HoldersRevenue, 'Aave starts buy back AAVE tokens.');
+  assert.equal(d[0].methodology.Junk, undefined);
+  assert.equal(d[0].shareOfFees, 99.6);
+  assert.ok(d[0].methodologyUrl.startsWith('https://github.com/'));
+  assert.equal(feeDefinitions(fees, { parentIds: new Set(['parent#nothing']) }), null);
+  assert.equal(feeDefinitions({ ok: false }, { parentIds: new Set(['parent#aave']) }), null);
+});
+
+// ---------- unlock sizes ----------
+import { unlockSize, sizeTokenUnlocks, sizeText } from '../scripts/lib/unlock-size.mjs';
+
+test('unlock size: dollars today, share of circulating supply, days of volume', () => {
+  // ENA, Nov 2026: 93.75M tokens a month at $0.1414, 13.5B circulating, $300M daily volume
+  const z = unlockSize(93_750_000, { price: 0.1414, circulating: 13_500_000_000, volume24h: 300_000_000 });
+  assert.equal(z.usd, 13_256_250);
+  assert.equal(z.pctCirculating, 0.6944);
+  assert.equal(z.daysOfVolume, 0.04419);
+  assert.equal(sizeText(z), 'about $13.3M at today’s price · 0.69% of circulating supply · 0.044 days of trading volume');
+  // an unlock with no published amount has no size, and nothing is estimated
+  assert.deepEqual(unlockSize(null, { price: 1, circulating: 1, volume24h: 1 }), { usd: null, pctCirculating: null, daysOfVolume: null });
+  assert.equal(sizeText(unlockSize(null, {})), '');
+  // missing inputs leave only the parts that can be calculated
+  assert.deepEqual(unlockSize(1000, { price: 2 }), { usd: 2000, pctCirculating: null, daysOfVolume: null });
+  assert.deepEqual(unlockSize(1000, { circulating: 100_000 }), { usd: null, pctCirculating: 1, daysOfVolume: null });
+});
+
+test('sizeTokenUnlocks adds sizes and a 12-month summary without inventing amounts', () => {
+  const now = Date.parse('2026-11-12T00:00:00Z');
+  const month = (n) => Date.UTC(2026, 11 + n, 1) / 1000;
+  const u = {
+    status: 'scheduled',
+    events: [
+      { ts: month(0), precision: 'month', label: 'Core contributors', kind: 'monthly', tokens: 1000, share: 0.001, source: { url: 'https://docs.example/a' } },
+      { ts: month(0), precision: 'month', label: 'Investors', kind: 'monthly', tokens: null, share: null },
+      { ts: month(1), precision: 'month', label: 'Core contributors', kind: 'monthly', tokens: 1000, share: 0.001 },
+      { ts: month(2), precision: 'day', label: 'Founders: vesting ends', kind: 'vesting-end', tokens: null },
+    ],
+    schedules: [{ label: 'Core contributors', type: 'monthly', tokensPerPeriod: 1000 }, { label: 'Founders', type: 'linear', tokensPerMonth: 500 }, { label: 'No amount', type: 'linear', tokensPerMonth: null }],
+  };
+  const s = sizeTokenUnlocks(u, { price: 2, volume24h: 10_000 }, { circulating: 100_000 }, now);
+  assert.equal(s.events[0].usd, 2000);
+  assert.equal(s.events[0].pctCirculating, 1);
+  assert.equal(s.events[1].usd, null, 'no published amount: no size');
+  assert.equal(s.next.label, 'Core contributors');
+  assert.equal(s.next.usd, 2000);
+  assert.equal(s.next.sourceUrl, 'https://docs.example/a');
+  assert.equal(s.next12m.events, 3, 'a vesting end is a date, not an unlock');
+  assert.equal(s.next12m.unknown, 1);
+  assert.equal(s.next12m.tokens, 2000, 'only tranches with a published amount are added up');
+  assert.equal(s.next12m.pctCirculating, 2);
+  assert.equal(s.next12m.daysOfVolume, 0.4);
+  assert.equal(s.schedules[0].usdPerMonth, 2000);
+  assert.equal(s.schedules[1].usdPerMonth, 1000);
+  assert.equal(s.schedules[2].usdPerMonth, null);
+  assert.deepEqual(s.vesting, [], 'only vesting marked as still running is listed');
+  const run = sizeTokenUnlocks({ status: 'scheduled', events: [], schedules: [{ label: 'Founders', type: 'linear', ongoing: true, end: '2027-11-21', tokensPerMonth: 500, source: { url: 'https://docs.example/f' } }] }, { price: 2 }, { circulating: 100_000 }, now);
+  assert.deepEqual(run.vesting, [{ label: 'Founders', end: '2027-11-21', tokensPerMonth: 500, usdPerMonth: 1000, pctCirculatingPerMonth: 0.5, sourceUrl: 'https://docs.example/f' }]);
+  assert.equal(u.events[0].usd, undefined, 'the input is not changed');
+  // nothing dated ahead: a summary of zeros, no "next"
+  const none = sizeTokenUnlocks({ status: 'unconfirmed', events: [], schedules: [] }, { price: 2 }, { circulating: 1 }, now);
+  assert.equal(none.next, null);
+  assert.deepEqual(none.next12m, { events: 0, unknown: 0, tokens: null, usd: null, pctCirculating: null, daysOfVolume: null });
+  // no price: no sizes, and it says so
+  assert.equal(sizeTokenUnlocks(u, {}, {}, now).sizedAt, null);
+});
+
+// ---------- what the fee total is made of ----------
+import { feeComposition } from '../scripts/lib/defillama.mjs';
+
+test('feeComposition separates stablecoin issuers and chains from fees paid to applications', () => {
+  const c = feeComposition([
+    { name: 'Tether', category: 'Stablecoin Issuer', total30d: 514e6 }, { name: 'Circle USDC', category: 'Stablecoin Issuer', total30d: 205e6 },
+    { name: 'Ethereum', category: 'Chain', total30d: 81e6 }, { name: 'Hyperliquid Perps', category: 'Derivatives', total30d: 86e6 },
+    { name: 'Aave V3', category: 'Lending', total30d: 114e6 }, { name: 'Broken', category: 'Dexs', total30d: null }, { name: 'Refund', category: 'Dexs', total30d: -5 },
+  ]);
+  assert.equal(c.listedTotal30d, 1e9);
+  assert.deepEqual(c.parts.map((p) => [p.key, p.total30d, p.share]), [['Stablecoin Issuer', 719e6, 71.9], ['Chain', 81e6, 8.1]]);
+  assert.equal(c.apps.total30d, 200e6);
+  assert.equal(c.apps.share, 20);
+  assert.deepEqual(feeComposition([{ name: 'A', category: 'Dexs', total30d: 10 }]).parts, [], 'nothing to flag when neither category is present');
+  assert.equal(feeComposition([]), null);
+});
+
+// ---------- catalysts: whose launch is it, and what is it about ----------
+import { feedItems, topicsOf } from '../scripts/lib/feeds.mjs';
+
+test('a launch is only labelled as a protocol’s when the headline names it', () => {
+  const protocols = [{ slug: 'ondo-finance', name: 'Ondo Finance', symbol: 'ONDO', keywords: ['Ondo', 'ONDO'] }, { slug: 'ethena', name: 'Ethena', symbol: 'ENA', keywords: ['Ethena', 'ENA'] }];
+  const now = new Date().toUTCString();
+  const items = [
+    // seen live on 12 Nov 2026: tagged as an ONDO "launch / upgrade" because Ondo appeared in the summary
+    { title: 'Anthropic to Launch Nasdaq IPO Tuesday, IFR Reports', summary: 'Tokenized shares may trade on Ondo Global Markets.', link: 'https://news.example/a', date: now },
+    { title: 'Securitize and Ethena’s $100 million BlackRock BUIDL liquidity facility goes live', summary: '', link: 'https://news.example/b', date: now },
+    { title: 'Ondo proposes a fee switch and buyback for ONDO', summary: '', link: 'https://news.example/c', date: now },
+  ];
+  const out = feedItems({ items, feed: { name: 'News', type: 'news' }, srcKey: 'feed-news', protocols });
+  assert.equal(out[0].type, 'news', 'someone else’s launch that mentions the protocol in passing stays news');
+  assert.deepEqual(out[0].passing, ['ondo-finance']);
+  assert.deepEqual(out[0].protocols, ['ondo-finance'], 'it is still listed for the protocol, marked as a passing mention');
+  assert.equal(out[1].type, 'launch-upgrade', 'named in the headline: its launch');
+  assert.deepEqual(out[1].passing, []);
+  assert.equal(out[2].type, 'news');
+  assert.deepEqual(out[2].topics, ['token-economics']);
+  // a protocol's own forum or blog is about that protocol even when the title doesn't name it
+  const own = feedItems({ items: [{ title: 'Mainnet upgrade scheduled', summary: '', link: 'https://forum.example/x', date: now }], feed: { name: 'Ondo forum', type: 'governance-forum' }, srcKey: 'feed-forum', protocols, ownerSlug: 'ondo-finance' });
+  assert.equal(own[0].type, 'launch-upgrade');
+  assert.deepEqual(own[0].passing, []);
+});
+
+test('topicsOf tags titles about what reaches token holders, and nothing else', () => {
+  for (const t of ['[ARFC] Aave buyback programme renewal', 'Activate the fee switch on Base', 'MIP-021: SYRUP buy-backs', 'Reduce COMP emissions by 20%', 'Extend team vesting', 'Burn 5% of supply']) assert.deepEqual(topicsOf(t), ['token-economics'], t);
+  for (const t of ['Add new LLTVs on Morpho Midnight', 'Risk Stewards: cap changes on Aave V3', 'Onboard weETH as collateral', '']) assert.deepEqual(topicsOf(t), [], t);
+});

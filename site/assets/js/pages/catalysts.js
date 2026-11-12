@@ -32,7 +32,9 @@ export async function render(root, { query }) {
   if (!cat) { root.append(pageError(error)); return; }
   const S = cat.sources || {};
   const protocols = cat.protocols || [];
+  const DATED = ['governance-vote', 'unlock', 'scheduled']; // things with a date that decide or release something
   const state = {
+    topic: query.get('topic') === 'token-economics',
     p: new Set((query.get('p') || '').split(',').filter(Boolean)),
     types: new Set((query.get('type') || '').split(',').filter(Boolean)),
     range: RANGES[query.get('range')] ? query.get('range') : 'all',
@@ -45,7 +47,7 @@ export async function render(root, { query }) {
 
   // ---------- filters ----------
   const chipRow = (items, set, key) => h('div', { class: 'group' }, items.map(([val, label]) => {
-    const b = h('button', { type: 'button', class: 'chip', 'aria-pressed': String(set.has(val)) }, label);
+    const b = h('button', { type: 'button', class: 'chip', 'aria-pressed': String(set.has(val)), 'data-val': val }, label);
     b.addEventListener('click', () => { set.has(val) ? set.delete(val) : set.add(val); b.setAttribute('aria-pressed', String(set.has(val))); apply(); });
     return b;
   }));
@@ -55,9 +57,24 @@ export async function render(root, { query }) {
   rangeSel.addEventListener('change', () => { state.range = rangeSel.value; apply(); });
   const search = h('input', { type: 'search', placeholder: 'Search titles…', value: state.q, 'aria-label': 'Search catalysts' });
   search.addEventListener('input', () => { state.q = search.value.trim(); apply(); });
+  // presets: dated events only (votes, unlocks, scheduled dates) or everything, and a keyword tag for token economics
+  const datedOn = () => state.types.size === DATED.filter((k) => counts[k]).length && DATED.filter((k) => counts[k]).every((k) => state.types.has(k));
+  const presetDated = h('button', { type: 'button', class: 'chip', 'aria-pressed': 'false', title: 'Votes, unlocks and scheduled dates: no forum posts, blogs or news' }, 'Dated events only');
+  const presetTopic = h('button', { type: 'button', class: 'chip', 'aria-pressed': String(state.topic), title: 'Titles that mention buybacks, a fee switch, burns, emissions, vesting, unlocks or revenue sharing (a keyword match)' }, 'Token economics (keyword)');
+  const syncPresets = () => { presetDated.setAttribute('aria-pressed', String(datedOn())); presetTopic.setAttribute('aria-pressed', String(state.topic)); };
+  presetDated.addEventListener('click', () => {
+    const on = datedOn();
+    state.types.clear();
+    if (!on) DATED.filter((k) => counts[k]).forEach((k) => state.types.add(k));
+    typeRow.querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(state.types.has(b.dataset.val))));
+    apply();
+  });
+  presetTopic.addEventListener('click', () => { state.topic = !state.topic; apply(); });
+  const typeRow = chipRow(Object.entries(TYPES).filter(([k]) => counts[k]).map(([k, t]) => [k, `${t.label} (${counts[k]})`]), state.types, 'type');
   root.append(h('div', { class: 'filters' },
+    h('label', { class: 'lbl' }, 'Show'), h('div', { class: 'group' }, presetDated, presetTopic),
     h('label', { class: 'lbl' }, 'Token'), chipRow(protocols.map((p) => [p.slug, `${p.symbol || p.name}${p.group === 'peer' ? ' (peer)' : ''}`]), state.p, 'p'),
-    h('label', { class: 'lbl' }, 'Type'), chipRow(Object.entries(TYPES).filter(([k]) => counts[k]).map(([k, t]) => [k, `${t.label} (${counts[k]})`]), state.types, 'type'),
+    h('label', { class: 'lbl' }, 'Type'), typeRow,
     h('label', { class: 'lbl' }, 'When'), rangeSel, search));
 
   const timelineHolder = h('div');
@@ -76,13 +93,15 @@ export async function render(root, { query }) {
       if (t < from || t > to) return false;
       if (state.p.size && !i.protocols.some((s) => state.p.has(s))) return false;
       if (state.types.size && !state.types.has(i.type)) return false;
+      if (state.topic && !(i.topics || []).includes('token-economics') && i.type !== 'unlock') return false;
       if (q && !`${i.title} ${i.summary} ${i.sourceName}`.toLowerCase().includes(q)) return false;
       return true;
     });
   }
 
   function apply() {
-    setQuery({ p: [...state.p].join(','), type: [...state.types].join(','), range: state.range === 'all' ? '' : state.range, q: state.q });
+    setQuery({ p: [...state.p].join(','), type: [...state.types].join(','), range: state.range === 'all' ? '' : state.range, q: state.q, topic: state.topic ? 'token-economics' : '' });
+    syncPresets();
     const items = filtered();
     const now = Date.now();
     const r = RANGES[state.range];
@@ -118,6 +137,9 @@ export async function render(root, { query }) {
         h('div', { class: 'chips', style: { marginBottom: '4px' } }, h('span', { class: 'chip' }, h('span', { class: 'type-dot', style: { background: `var(--s${(T.slot % 8) + 1})` } }), T.term ? term(T.label, T.term) : T.label), (i.symbols || []).map((s) => h('span', { class: 'chip solid' }, s))),
         extLink(i.url, i.title, { class: 'title' }),
         i.manual ? h('span', { class: 'chip', style: { marginLeft: '6px' }, title: 'Taken by hand from the project’s own docs; open the link to check it' }, 'hand-checked') : null,
+        (i.topics || []).includes('token-economics') ? h('span', { class: 'chip', style: { marginLeft: '6px' }, title: 'The title mentions buybacks, a fee switch, burns, emissions, vesting, unlocks or revenue sharing. A keyword match: open the source to judge.' }, 'token economics (keyword)') : null,
+        (i.passing || []).length && (i.passing || []).length === (i.protocols || []).length ? h('span', { class: 'chip', style: { marginLeft: '6px' }, title: 'The protocol is named in the article’s summary, not in its headline, so it may only be mentioned in passing.' }, 'mentioned in passing') : null,
+        i.sizeText ? h('div', { class: 'summary', style: { fontSize: '13px', marginTop: '3px' } }, h('b', {}, 'Size: '), i.sizeText, h('span', { class: 'badge calc', 'data-term': 'calculated', tabindex: 0, style: { marginLeft: '6px' } }, 'Calculated'), S[i.sizeSrc] ? h('span', { class: 'sub' }, ' from the ', extLink(S[i.sizeSrc].api, 'price snapshot'), S[i.sizeSrc].fetchedAt ? ` of ${dateTime(S[i.sizeSrc].fetchedAt)}` : '') : null) : null,
         i.summary ? h('div', { class: 'summary', style: { fontSize: '13px', color: 'var(--ink-2)', marginTop: '3px' } }, i.summary) : null,
         h('p', { class: 'src', style: { marginTop: '6px' } }, 'Source: ', extLink(i.url, i.sourceName), src?.fetchedAt ? ` · fetched ${dateTime(src.fetchedAt)}` : '', i.type === 'launch-upgrade' ? ' · type from keyword match' : '')));
   }

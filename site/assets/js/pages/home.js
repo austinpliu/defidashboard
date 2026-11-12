@@ -2,11 +2,13 @@
 import { h, openExternal, append, band, statTile, sparkline, sourceLine, subhead, segmented, extLink, pageError, term, unavailable } from '../ui.js';
 import { chartCard, infoCard } from '../cards.js';
 import { loadMany } from '../data.js';
+import { primaryOf } from '../size.js';
 import { lineChart, hbarChart, divergingChart, columnChart, stackedColumns, themeOf } from '../charts.js';
-import { usd, pct, dateTime, date, relative, shortDate, compact, monthYear } from '../format.js';
+import { usd, usdPrice, pct, dateTime, date, relative, shortDate, compact, monthYear } from '../format.js';
 import { trimDays, indexTo100, weeklySum, monthlyLast, valueAt, RANGES, rangeLabel, changeOver } from '../series.js';
 import {
   trendTakeaway, chainTakeaway, leaderTakeaway, stablecoinTakeaway, moversTakeaway, flowTakeaway, categoryTakeaway, compareTakeaway, catalystTakeaway,
+  feesTotalTakeaway, headlinesTakeaway,
 } from '../takeaways.js';
 
 const TYPE_LABEL = {
@@ -104,16 +106,19 @@ export async function render(root) {
     const cards = watch.map((p) => h('a', { class: 'wcard acc-yellow', href: `#/protocol/${p.slug}` },
       h('div', { class: 'w-top' }, p.logo ? h('img', { src: p.logo, alt: '', loading: 'lazy', width: 26, height: 26, onerror: (e) => e.target.remove() }) : null, h('div', {}, h('div', { class: 'w-name' }, p.name), h('div', { class: 'w-sym' }, [p.symbol, p.category].filter(Boolean).join(' · ')))),
       h('div', { class: 'w-rows' },
-        h('span', {}, 'TVL'), h('span', { class: 'v' }, usd(p.tvl), ' ', h('span', { class: `delta ${p.tvlChange7d > 0 ? 'up' : p.tvlChange7d < 0 ? 'down' : 'flat'}` }, pct(p.tvlChange7d))),
+        // a protocol with no TVL (real-world-asset issuers) shows the measure that fits it, named
+        ...(p.tvl == null && primaryOf(p.size)
+          ? [h('span', { title: primaryOf(p.size).what }, primaryOf(p.size).label), h('span', { class: 'v' }, usd(primaryOf(p.size).value))]
+          : [h('span', {}, 'TVL'), h('span', { class: 'v' }, usd(p.tvl), ' ', h('span', { class: `delta ${p.tvlChange7d > 0 ? 'up' : p.tvlChange7d < 0 ? 'down' : 'flat'}` }, pct(p.tvlChange7d)))]),
         h('span', {}, 'Fees 30d'), h('span', { class: 'v' }, usd(p.fees30d)),
-        h('span', {}, p.symbol ? `${p.symbol} price` : 'Token'), h('span', { class: 'v' }, p.price != null ? usd(p.price) : '—', ' ', p.price != null ? h('span', { class: `delta ${p.priceChange7d > 0 ? 'up' : p.priceChange7d < 0 ? 'down' : 'flat'}` }, pct(p.priceChange7d)) : null)),
+        h('span', {}, p.symbol ? `${p.symbol} price` : 'Token'), h('span', { class: 'v' }, p.price != null ? usdPrice(p.price) : '—', ' ', p.price != null ? h('span', { class: `delta ${p.priceChange7d > 0 ? 'up' : p.priceChange7d < 0 ? 'down' : 'flat'}` }, pct(p.priceChange7d)) : null)),
       h('div', { class: 'w-spark' }, sparkline(p.tvlSpark, { height: 36 })),
     ));
-    const srcs = [watch[0]?.srcTvl ? { ...watch[0].srcTvl, label: 'TVL & fees (each protocol page links its own endpoint)', page: 'https://defillama.com/', api: null } : null, watch.find((p) => p.srcPrice)?.srcPrice ? { ...watch.find((p) => p.srcPrice).srcPrice, label: 'token prices', page: 'https://www.coingecko.com/', api: null } : null].filter(Boolean);
+    const srcs = [watch[0]?.srcTvl ? { ...watch[0].srcTvl, label: 'TVL & fees (each protocol page links its own endpoint)', page: 'https://defillama.com/', api: null } : null, idx.priceSnapshot ? { ...idx.priceSnapshot, label: 'token prices, one request for all tokens' } : watch.find((p) => p.srcPrice)?.srcPrice ? { ...watch.find((p) => p.srcPrice).srcPrice, label: 'token prices', page: 'https://www.coingecko.com/', api: null } : null].filter(Boolean);
     grid.append(h('div', { class: 'span-12' },
       subhead('Your watchlist', 'The protocols you follow', h('a', { href: '#/protocols', class: 'tool' }, 'All protocol details →')),
       h('div', { class: 'watch-grid' }, cards),
-      h('p', { class: 'src' }, 'Changes are 7-day. Sparkline: TVL over the last 30 days. '),
+      h('p', { class: 'src' }, 'Changes are 7-day. Sparkline: TVL over the last 30 days. Protocols without a TVL show tokenized assets or open interest instead (see Tokens › Size). '),
       sourceLine(srcs)));
   }
 
@@ -174,7 +179,7 @@ export async function render(root) {
       termKey: 'fees',
       take: leaderTakeaway(listFor(which).list, { metric: which }),
       title: `Top protocols by ${which}, last 30 days`,
-      note: 'Child protocols are combined under their parent (e.g. Aave V2 + V3 → Aave). Chains and exchanges are excluded.',
+      note: `Child protocols are combined under their parent (e.g. Aave V2 + V3 → Aave). Chains and exchanges are excluded.${[...(m.topFees?.list || []), ...(m.topRevenue?.list || [])].some((p) => p.category === 'Stablecoin Issuer') ? ' Stablecoin issuers are included: their “fees” are income on the reserves behind their coins, not fees paid by people using DeFi.' : ''}`,
       size: 'tall',
       controls: segmented([{ value: 'fees', label: 'Fees' }, { value: 'revenue', label: 'Revenue' }], which, (v) => {
         which = v;
@@ -268,7 +273,11 @@ export async function render(root) {
     const card = chartCard({
       kicker: kick,
       termKey: key === 'dexVolume' ? 'dexVolume' : 'fees',
-      take: key === 'dexVolume' ? flowTakeaway('DEX volume', x, 'swapped') : (x.total30d ? { pre: 'DeFi users paid ', hl: `${usd(x.total30d)} in fees`, post: ' over the last 30 days' } : null),
+      take: key === 'dexVolume' ? flowTakeaway('DEX volume', x, 'swapped') : feesTotalTakeaway(x),
+      // what the fee total is made of: stablecoin issuers and chains are in it
+      note: key === 'fees' && x.composition?.parts?.length
+        ? `Not only fees paid by DeFi users. Of the ${usd(x.composition.listedTotal30d)} the listed entries add up to over 30 days, ${x.composition.parts.map((p) => `${usd(p.total30d)} (${pct(p.share, { signed: false, digits: 0 })}) is ${p.label}`).join(' and ')}; the remaining ${usd(x.composition.apps.total30d)} (${pct(x.composition.apps.share, { signed: false, digits: 0 })}) is paid to applications. DefiLlama’s own 30-day total is ${usd(x.total30d)}.`
+        : null,
       title: `${label}, ${range === 90 ? 'daily, last 90 days' : 'weekly'}`,
       controls: segmented([{ value: 90, label: '90D daily' }, { value: 365, label: '1Y weekly' }, { value: 730, label: '2Y weekly' }], range, (v) => { range = v; card.update({ build: columnChart({ data: data(), name: label, period: v === 90 ? 'day' : 'week' }), title: `${label}, ${v === 90 ? 'daily, last 90 days' : `weekly, last ${v === 365 ? 'year' : '2 years'}`}` }); }, 'Range'),
       build: columnChart({ data: data(), name: label }),
@@ -332,7 +341,12 @@ export async function render(root) {
     const heads = (cat.headlines || []).slice(0, 8);
     grid.append(h('div', { class: 'span-6' }, infoCard({
       kicker: 'News',
-      take: heads.length ? { pre: '', hl: `${cat.headlines.length} DeFi headlines`, post: ` in the last 3 weeks from ${new Set(cat.headlines.map((x) => x.sourceName)).size} outlets` } : null,
+      // counts every matching headline (older data files only know the ones listed)
+      take: heads.length ? headlinesTakeaway({
+        total: cat.headlinesTotal ?? cat.headlines.length, shown: heads.length,
+        sinceTs: Date.parse(cat.headlinesSince || cat.headlines[cat.headlines.length - 1].date),
+        outlets: cat.headlinesOutlets ?? new Set(cat.headlines.map((x) => x.sourceName)).size, now,
+      }) : null,
       fallback: 'Latest DeFi headlines',
       body: heads.length
         ? h('ul', { class: 'feed' }, heads.map((i) => h('li', {}, h('div', { class: 'when' }, shortDate(i.date), h('br'), relative(i.date)), h('div', { class: 'what' }, extLink(i.url, i.title), h('div', { class: 'meta' }, h('span', {}, i.sourceName), i.symbols?.map((s) => h('span', { class: 'chip' }, s)))))))

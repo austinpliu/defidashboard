@@ -35,7 +35,7 @@ const listOf = (res) => (res?.ok && Array.isArray(res.data) ? res.data : null);
  * One row per coin (union of both lists, ranked by market cap). `defi` is true/false when
  * the DeFi list loaded, and null when it didn't (unknown, rather than "not DeFi").
  */
-export function buildCoinRows(allRes, defiRes, trackedIds = new Set()) {
+export function buildCoinRows(allRes, defiRes, trackedIds = new Set(), snapshotById = null) {
   const all = listOf(allRes);
   if (!all) return null;
   const defiList = listOf(defiRes);
@@ -62,6 +62,27 @@ export function buildCoinRows(allRes, defiRes, trackedIds = new Set()) {
       tracked: trackedIds.has(c.id),
       page: `${CG.site}/${c.id}`,
     });
+  }
+  // Tracked tokens take their numbers from the price snapshot (the same request the rest of
+  // the site uses for them), so one token never shows two prices on one page.
+  if (snapshotById) {
+    for (const [id, s] of snapshotById) {
+      const r = rows.get(id);
+      if (!r) continue;
+      Object.assign(r, {
+        price: roundSmart(s.current_price),
+        mcap: roundSmart(s.market_cap),
+        fdv: roundSmart(s.fully_diluted_valuation),
+        volume24h: roundSmart(s.total_volume),
+        change24h: roundSmart(s.price_change_percentage_24h_in_currency ?? s.price_change_percentage_24h),
+        change7d: roundSmart(s.price_change_percentage_7d_in_currency),
+        change30d: roundSmart(s.price_change_percentage_30d_in_currency),
+        circulating: roundSmart(s.circulating_supply),
+        maxSupply: roundSmart(s.max_supply),
+        athChange: roundSmart(s.ath_change_percentage),
+        snapshot: true,
+      });
+    }
   }
   return [...rows.values()].sort((a, b) => (a.rank ?? 1e9) - (b.rank ?? 1e9));
 }

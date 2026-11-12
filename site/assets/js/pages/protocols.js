@@ -4,8 +4,9 @@ import { chartCard } from '../cards.js';
 import { loadMany } from '../data.js';
 import { hbarChart } from '../charts.js';
 import { dataTable } from '../table.js';
-import { usd, pct, ratio } from '../format.js';
+import { usd, usdPrice, pct, ratio } from '../format.js';
 import { leaderTakeaway, compareTakeaway } from '../takeaways.js';
+import { sizeCell, primaryOf } from '../size.js';
 
 export async function render(root) {
   const files = await loadMany(['index.json']);
@@ -13,7 +14,9 @@ export async function render(root) {
   if (!idx) { root.append(pageError(files['index.json'].error)); return; }
   const rows = idx.protocols.map((p) => ({
     ...p,
-    mcapToFees: p.mcap && p.fees30d ? p.mcap / ((p.fees30d * 365) / 30) : null,
+    // ratios are calculated once, in the data script, from the price snapshot (older data files: calculated here)
+    mcapToFees: p.valuation ? p.valuation.mcapToFees : p.mcap && p.fees30d ? p.mcap / ((p.fees30d * 365) / 30) : null,
+    mcapToRevenue: p.valuation ? p.valuation.mcapToRevenue : null,
     groupLabel: p.group === 'peer' ? 'Peer' : 'Watchlist',
   }));
   const watch = rows.filter((r) => r.group === 'watchlist');
@@ -30,25 +33,28 @@ export async function render(root) {
     { key: 'groupLabel', label: 'List' },
     { key: 'category', label: 'Category' },
     { key: 'chains', label: 'Chains', fmt: (v) => h('span', { class: 'sub', title: (v || []).join(', ') }, `${(v || []).slice(0, 3).join(', ')}${(v || []).length > 3 ? ` +${v.length - 3}` : ''}`), sortValue: (r) => (r.chains || []).length },
-    { key: 'tvl', label: 'TVL', num: true, fmt: (v) => usd(v), termKey: 'tvl' },
+    // TVL where DefiLlama has one; otherwise the measure that fits (tokenized assets, open interest), labelled
+    { key: 'tvl', label: 'TVL / size', num: true, fmt: (v, r) => (v != null ? usd(v) : sizeCell(r.size, { always: true })), sortValue: (r) => r.tvl ?? primaryOf(r.size)?.value ?? null, csv: (r) => r.tvl ?? primaryOf(r.size)?.value ?? '', termKey: 'sizeMeasure', title: 'TVL, or for protocols without one the measure named beside the number' },
     { key: 'tvlChange7d', label: 'TVL 7d', num: true, fmt: (v) => h('span', { class: `delta ${v > 0 ? 'up' : v < 0 ? 'down' : 'flat'}` }, pct(v)), csv: (r) => r.tvlChange7d },
     { key: 'tvlChange30d', label: 'TVL 30d', num: true, fmt: (v) => h('span', { class: `delta ${v > 0 ? 'up' : v < 0 ? 'down' : 'flat'}` }, pct(v)), csv: (r) => r.tvlChange30d },
     { key: 'tvlSpark', label: '30d trend', fmt: (v) => h('div', { style: { width: '90px' } }, sparkline(v, { height: 22, fill: false })), sortValue: (r) => r.tvlChange30d, csv: () => '' },
     { key: 'fees30d', label: 'Fees 30d', num: true, fmt: (v) => usd(v), termKey: 'fees' },
     { key: 'revenue30d', label: 'Revenue 30d', num: true, fmt: (v) => usd(v), termKey: 'revenue' },
     { key: 'symbol', label: 'Token', fmt: (v, r) => (r.tokenId ? h('a', { href: `#/token/${r.tokenId}` }, v || r.tokenId) : v || '—') },
-    { key: 'price', label: 'Price', num: true, fmt: (v) => usd(v) },
+    { key: 'price', label: 'Price', num: true, fmt: (v) => usdPrice(v) },
     { key: 'priceChange7d', label: 'Price 7d', num: true, fmt: (v) => h('span', { class: `delta ${v > 0 ? 'up' : v < 0 ? 'down' : 'flat'}` }, pct(v)), csv: (r) => r.priceChange7d },
     { key: 'mcap', label: 'Market cap', num: true, fmt: (v) => usd(v), termKey: 'marketCap' },
+    { key: 'holdersRevenue30d', label: 'To holders 30d', num: true, fmt: (v) => usd(v), termKey: 'holdersRevenue' },
     { key: 'mcapToFees', label: 'Mcap ÷ ann. fees', num: true, fmt: (v) => ratio(v), termKey: 'mcapToFees', title: 'Calculated: market cap ÷ (30-day fees × 365 ÷ 30)' },
+    { key: 'mcapToRevenue', label: 'Mcap ÷ ann. revenue', num: true, fmt: (v, r) => (v != null ? ratio(v) : r.revenue30d === 0 ? h('span', { class: 'sub' }, 'no revenue') : '—'), termKey: 'mcapToRevenue', title: 'Calculated: market cap ÷ (30-day revenue × 365 ÷ 30)' },
   ];
   root.append(h('section', { class: 'card' },
     h('div', { class: 'kicker' }, 'Watchlist + peers'),
     // unfiltered, so "every protocol here" is only said when every row has TVL data
     takeaway(compareTakeaway(watch.map((r) => ({ name: r.name, change: r.tvlChange30d })), 'TVL', 'the last 30 days'), 'Every tracked protocol at a glance'),
     dataTable({ caption: 'Tracked protocols', columns, rows, sortKey: 'tvl', filters: [{ key: 'category', label: 'Category', plural: 'categories' }, { key: 'chains', label: 'Chain' }, { key: 'groupLabel', label: 'List', plural: 'lists' }], csvName: 'watchlist', rowClass: (r) => (r.group === 'watchlist' ? 'is-watch' : null), pageSize: 50 }),
-    sourceLine([rows[0]?.srcTvl, rows.find((r) => r.srcPrice)?.srcPrice].filter(Boolean).map((s) => ({ ...s, label: `${s.label} (each protocol page links its exact endpoint)` }))),
-    h('p', { class: 'src' }, 'Mcap ÷ annualized fees is calculated here: CoinGecko market cap ÷ (DefiLlama 30-day fees × 365 ÷ 30).')));
+    sourceLine([rows[0]?.srcTvl ? { ...rows[0].srcTvl, label: 'TVL, fees and revenue (each protocol page links its exact endpoint)' } : null, idx.priceSnapshot || (rows.find((r) => r.srcPrice)?.srcPrice ? { ...rows.find((r) => r.srcPrice).srcPrice, label: 'token prices (each token page links its exact endpoint)' } : null)].filter(Boolean)),
+    h('p', { class: 'src' }, 'The two multiples are calculated: CoinGecko market cap ÷ (DefiLlama 30-day fees or revenue × 365 ÷ 30). “Fees” means different things for different kinds of protocol; the Tokens page explains and compares on revenue and holders revenue.')));
 
   const grid = h('div', { class: 'grid', style: { marginTop: '18px' } });
   root.append(grid);

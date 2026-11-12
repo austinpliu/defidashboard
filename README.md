@@ -14,9 +14,9 @@ Me: a writer and researcher, not an engineer. I can run commands and read code, 
 |---|---|
 | **01 Overview** | Headline strip (total DeFi TVL, stablecoin supply, DEX volume, fees, each with 7-day and 30-day change), your watchlist at a glance, TVL history, TVL by chain, chain growth, top protocols by fees and revenue, stablecoin supply by issuer, biggest movers this week, daily DEX volume and fees, TVL by category, upcoming catalysts and latest headlines. |
 | **02 Protocols** | A table of your watchlist, plus one page per protocol: a two-sentence description, TVL history (90 days / 1 year / all), TVL by chain and by asset, fees and revenue, token price, market cap, FDV, valuation ratios, supply, top yield pools, governance votes, hacks and timeline notes, funding rounds, news, links (website, docs, X, GitHub, audits) and a list of every source used on the page. |
-| **03 Tokens** | One page per token: price, volume, market cap, FDV, all-time high, supply breakdown, DEX pools and liquidity, contract addresses, and the protocol it belongs to. The list page also has about 400 more coins (CoinGecko's 250 largest plus the 250 largest DeFi coins), sortable, searchable and filterable by DeFi / other. |
+| **03 Tokens** | Four tables for the tokens you track. **Prices:** 24h, 7d, 30d, 90d and 1y changes, market cap, FDV and market cap as a share of FDV. **Valuation against earnings:** 30-day fees, revenue and holders revenue, how much of the fees the protocol keeps, how much of the revenue reaches holders, and the token's value ÷ a year of each (by market cap or by FDV). **Size:** each protocol in the measure that fits it (TVL, tokenized assets for real-world-asset issuers, open interest for perps exchanges). **Upcoming unlocks:** the next unlock and the next 12 months, in tokens, dollars, share of circulating supply and days of trading volume. Then one page per token (price, volume, supply, unlock schedule, DEX pools, contracts), and about 400 more coins from CoinGecko's market list. See [Comparing like with like](#comparing-like-with-like). |
 | **04 Compare** | Pick 2–5 protocols. Overlay TVL, fees, revenue, token price or market cap (in dollars or "growth since the start = 100"), plus a side-by-side metrics table (TVL growth, fees, revenue, market cap ÷ fees and more). The address bar link saves the view. |
-| **05 Catalysts** | Governance votes, scheduled events, launches and upgrades, governance forum posts, protocol blog posts and news about your watchlist, as a dated timeline and a filterable list (token, type, date range, search). Labelled as information, not prediction. Below it, prediction markets: the busiest crypto markets on Polymarket with their current odds, and the prediction-market protocols on DefiLlama. |
+| **05 Catalysts** | Governance votes, token unlocks (with their size), scheduled events, launches and upgrades, governance forum posts, protocol blog posts and news about your watchlist, as a dated timeline and a filterable list (token, type, date range, search, plus two quick filters: dated events only, and titles about token economics). Labelled as information, not prediction. Below it, prediction markets: the busiest crypto markets on Polymarket with their current odds, and the prediction-market protocols on DefiLlama. |
 | **06 Screener** | The ~600 largest DeFi protocols. Sort any column, filter by category and chain, search, export CSV. |
 | **10 Fundamentals** | A fundamentals-first checklist for every watchlist protocol and token, labelled as a research aid, not a rating or a buy signal. It has seven checks: revenue reaching holders, revenue relative to size, the fee-switch option, supply overhang, liquidity and float, track record, and narrative vs fundamentals. Each check shows ✓ strong, ~ mixed, ✗ weak or "no data" (with the reason), plus the numbers, a one-sentence explanation and source links. The section has a sortable, filterable overview, a detail page per protocol with four charts, a compact card on protocol and token pages, and a Settings panel for your own thresholds. See [Fundamentals Checklist](#fundamentals-checklist) below. |
 | **07 Glossary** | Every metric explained in one sentence. The same text appears when you hover or tap the (?) next to a number. |
@@ -47,15 +47,26 @@ The script also opens every source link and records whether it works (`site/data
 
 | Source | Used for | Key needed? |
 |---|---|---|
-| [DefiLlama](https://api-docs.defillama.com/) | TVL (total, by chain, by protocol), fees, revenue, DEX volume, stablecoins, yield pools, hacks, funding rounds (from each protocol's profile), timeline notes | No (free endpoints only) |
-| [CoinGecko](https://docs.coingecko.com/docs/keyless-public-api) | Token price, market cap, FDV, volume, supply, contract addresses, and the market-wide coin list | No (keyless public API) |
+| [DefiLlama](https://api-docs.defillama.com/) | TVL (total, by chain, by protocol), fees, revenue, holders revenue and DefiLlama's definitions of each, perps open interest, DEX volume, stablecoins, yield pools (also used for tokenized assets), hacks, funding rounds (from each protocol's profile), timeline notes | No (free endpoints only) |
+| [CoinGecko](https://docs.coingecko.com/docs/keyless-public-api) | The price snapshot (price, market cap, FDV, volume and price changes for every tracked token, in one request), each token's profile, supply, history and contract addresses, and the market-wide coin list | No (keyless public API) |
 | [DexScreener](https://docs.dexscreener.com/api/reference) | DEX pairs and liquidity | No |
 | [GeckoTerminal](https://apiguide.geckoterminal.com/) | DEX pools (when DexScreener doesn't cover a chain) | No |
 | [Snapshot](https://docs.snapshot.box/) | Governance proposals and votes | No |
 | [Polymarket](https://docs.polymarket.com/) | Crypto prediction markets: outcome prices (odds), volume, liquidity, end dates | No (public Gamma API) |
 | RSS feeds | News (CoinDesk, The Block, Decrypt, Cointelegraph, Blockworks, DL News, The Defiant), protocol blogs (Medium) and governance forums (Discourse) | No |
 
-What isn't available for free (shown as "unavailable" on the site): **token unlock schedules** and DefiLlama's global **raises list** are on DefiLlama's paid Pro API, and no other keyless source exists. **Perpetuals trading volume** is Pro-only too. L2BEAT has no documented public API, so it isn't used. See `DECISIONS.md` for the details.
+What isn't available for free (shown as "unavailable" on the site): **token unlock schedules**, **token incentive emissions**, DefiLlama's global **raises list**, its **real-world-asset dataset** and **treasuries** are on DefiLlama's paid Pro API, and no other keyless source exists. **Perpetuals trading volume** is Pro-only too; perps **open interest** is free and is shown. L2BEAT has no documented public API, so it isn't used. See `DECISIONS.md` for the details.
+
+## Comparing like with like
+
+The dashboard is for comparing tokens, so it tries hard not to compare things that only look alike.
+
+- **One price per token.** Once per update, a single CoinGecko request fetches the price, market cap, FDV, volume and price changes of every token you track. Every table uses that one snapshot, and each says when it was taken, so a token never shows two prices on one page. If the snapshot fails, tokens keep the price from their own request and the page says so.
+- **Value against earnings, not against TVL.** TVL is deposits, not income: it flatters lenders and penalizes exchanges. The Tokens page divides each token's value by a year of fees, of revenue, and of holders revenue (30-day total × 365 ÷ 30). A protocol with $0 revenue shows "no revenue", not a multiple; a missing figure shows a dash.
+- **"Fees" differ by kind of protocol.** For a lender, fees are all the interest borrowers pay, and most of it goes to depositors. For a real-world-asset issuer such as Ondo, "fees" are the yield its token holders earn, and the issuer keeps none. For an exchange, they are trading fees. So compare on revenue or holders revenue first. Each protocol page quotes DefiLlama's own definition for that protocol.
+- **Size in the measure that fits.** TVL for lenders and vaults; **tokenized assets** for real-world-asset issuers (the sum of their listings in DefiLlama's yields list, because DefiLlama's dedicated RWA dataset is paid-only); **open interest** for perps exchanges. Lenders also show loans outstanding. These count different things: sort within one measure, never across them.
+- **Unlock sizes** are calculated from the hand-checked amounts in `unlocks.json` and the price snapshot: value today, share of circulating supply, days of trading volume. An unlock whose size the project doesn't publish says "not published".
+- **Headlines** above charts are generated by rules in `site/assets/js/takeaways.js`. Each rule has tests for the awkward cases (everything fell, a tie, no data), so a headline stays true when the numbers change.
 
 ## How to run it on your computer
 
@@ -252,7 +263,7 @@ If something is wrong (a slug or id DefiLlama or CoinGecko doesn't recognise, a 
 watchlist.json                 ← what to track (edit this)
 scripts/fetch-data.mjs         ← fetches all data into site/data/
 scripts/check-links.mjs        ← opens every source link and records the result
-scripts/lib/                   ← one file per data source + helpers
+scripts/lib/                   ← one file per data source + helpers (valuation.mjs, size.mjs and unlock-size.mjs hold the calculated figures)
 site/index.html                ← the website
 site/assets/js/pages/          ← one file per page
 site/assets/js/takeaways.js    ← the rules that write chart headlines

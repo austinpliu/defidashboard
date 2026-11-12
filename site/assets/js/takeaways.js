@@ -79,15 +79,44 @@ export function chainTakeaway(chains) {
   return { pre: `${top.name} holds `, hl: `${pct(top.share, { signed: false, digits: 0 })} of all DeFi TVL`, post: '' };
 }
 
-/** Leader in a ranked list of protocols by a money metric. scope names the comparison set. */
+/**
+ * Leader in a ranked list of protocols by a money metric. scope names the comparison set.
+ * "2.5x the fees of the next-largest" (not "2.5x more", which reads as 3.5x), and "took in"
+ * rather than "earned": fees are what users pay, not what a protocol keeps.
+ */
 export function leaderTakeaway(list, { metric = 'fees', field = 'total30d', period = 'the last 30 days', scope = 'protocol' } = {}) {
   if (!list?.length || !isNum(list[0][field])) return null;
   const [a, b] = list;
+  const verb = metric === 'revenue' ? 'kept' : 'took in';
   if (b && isNum(b[field]) && b[field] > 0) {
     const x = a[field] / b[field];
-    if (x >= 1.8) return { pre: `${a.name} earned `, hl: `${ratio(x).replace('×', 'x')} more ${metric}`, post: ` than any other ${scope} over ${period}` };
+    if (x >= 1.8) return { pre: `${a.name} ${verb} `, hl: `${Number(x.toFixed(1))}x the ${metric} of the next-largest ${scope}`, post: ` (${b.name}) over ${period}: ${usd(a[field])}` };
   }
   return { pre: `${a.name} `, hl: `led ${scope === 'protocol' ? 'all protocols' : `every ${scope}`} in ${metric}`, post: ` over ${period}, with ${usd(a[field])}` };
+}
+
+/**
+ * What DefiLlama's fee total is made of. composition: { total30d, parts: [{ key, label, total30d, share }] }
+ * where parts are the categories that are not fees paid by DeFi users (stablecoin issuers'
+ * reserve income, blockchains' own transaction fees).
+ */
+export function feesTotalTakeaway(fees) {
+  if (!fees || !isNum(fees.total30d)) return null;
+  const base = { pre: 'Protocols and chains tracked by DefiLlama took in ', hl: `${usd(fees.total30d)} of fees`, post: ' over the last 30 days' };
+  const big = (fees.composition?.parts || []).filter((p) => isNum(p.share) && p.share >= 10).sort((x, y) => y.share - x.share)[0];
+  if (!big) return base;
+  return { ...base, post: `${base.post}; about ${pct(big.share, { signed: false, digits: 0 })} of it is ${big.label}` };
+}
+
+/** "N DeFi headlines in the last D days from K outlets", counting every match, not the ones shown. */
+export function headlinesTakeaway({ total, shown, sinceTs, outlets, now = Date.now() }) {
+  if (!isNum(total) || total <= 0) return null;
+  const days = isNum(sinceTs) ? Math.max(1, Math.ceil((now - sinceTs) / 864e5)) : null;
+  return {
+    pre: '',
+    hl: `${total} DeFi headline${total === 1 ? '' : 's'}`,
+    post: `${days ? ` in the last ${days} day${days === 1 ? '' : 's'}` : ''}${isNum(outlets) && outlets > 0 ? ` from ${outlets} outlet${outlets === 1 ? '' : 's'}` : ''}${isNum(shown) && shown < total ? `; the latest ${shown} are listed` : ''}`,
+  };
 }
 
 /** Stablecoins: record supply, or how concentrated issuance is. */
@@ -165,17 +194,26 @@ export function protocolChainTakeaway(name, chainTvl) {
 }
 
 /**
- * Token valuation vs fees, ranked against other tracked protocols.
- * `others` = [{ name, value }] for every OTHER protocol (not this one).
+ * Token valuation against revenue, ranked against the other tracked protocols.
+ * v: { mcapToRevenue, mcapToFees, revenue30d }; others: [{ name, value }] = every OTHER
+ * protocol's market cap ÷ annualized revenue. A protocol that keeps no revenue has no revenue
+ * multiple; its fee multiple is given with the warning that those fees pass through it.
  */
-export function valuationTakeaway(symbol, mcapToFees, others = []) {
-  if (!isNum(mcapToFees) || mcapToFees <= 0) return null;
-  const valid = others.filter((p) => isNum(p.value) && p.value > 0);
-  const cheaper = valid.filter((p) => p.value < mcapToFees).length;
-  const base = { pre: `${symbol} trades at `, hl: `${ratio(mcapToFees)} annualized fees`, post: '' };
-  if (valid.length >= 2 && cheaper === 0) return { ...base, post: `, the lowest multiple of the ${valid.length + 1} protocols tracked here` };
-  if (valid.length >= 2 && cheaper === valid.length) return { ...base, post: `, the highest multiple of the ${valid.length + 1} protocols tracked here` };
-  return base;
+export function valuationTakeaway(symbol, v = {}, others = []) {
+  const m = v.mcapToRevenue;
+  if (isNum(m) && m > 0) {
+    const valid = others.filter((p) => isNum(p.value) && p.value > 0);
+    const lower = valid.filter((p) => p.value < m).length;
+    const base = { pre: `${symbol}’s market cap is `, hl: `${ratio(m)} annualized revenue`, post: '' };
+    if (valid.length >= 2 && lower === 0) return { ...base, post: `, the lowest multiple of the ${valid.length + 1} tracked protocols with revenue` };
+    if (valid.length >= 2 && lower === valid.length) return { ...base, post: `, the highest multiple of the ${valid.length + 1} tracked protocols with revenue` };
+    return base;
+  }
+  if (v.revenue30d === 0 && isNum(v.mcapToFees) && v.mcapToFees > 0) {
+    return { pre: `${symbol} has `, hl: 'no revenue multiple', post: `: the protocol keeps none of its fees. Its market cap is ${ratio(v.mcapToFees)} annualized fees, but those fees pass through to others` };
+  }
+  if (isNum(v.mcapToFees) && v.mcapToFees > 0) return { pre: `${symbol}’s market cap is `, hl: `${ratio(v.mcapToFees)} annualized fees`, post: ' (no revenue figure to compare it with)' };
+  return null;
 }
 
 export function priceTakeaway(symbol, market, series) {
@@ -249,4 +287,125 @@ export function catalystTakeaway(items, now = Date.now()) {
   const recent = items.filter((i) => Date.parse(i.date) <= now && now - Date.parse(i.date) < 7 * 864e5);
   if (recent.length) return { pre: '', hl: `${recent.length} items`, post: ' about your watchlist in the past week' };
   return null;
+}
+
+// ---------- Tokens page ----------
+
+const joinNames = (names) => (names.length <= 1 ? names.join('') : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`);
+
+/**
+ * Price moves across tracked tokens over one period. rows: [{ symbol, change }] (change in %).
+ * Says who rose most and who fell most, and never calls the smallest loser the biggest one:
+ * when every token fell (or rose) the headline says so first. Ties are named together.
+ */
+export function priceMovesTakeaway(rows, period = 'the past 7 days') {
+  const ok = (rows || []).filter((r) => isNum(r.change)).sort((a, b) => b.change - a.change);
+  if (ok.length < 2) return null;
+  const best = ok.filter((r) => r.change === ok[0].change);
+  const worst = ok.filter((r) => r.change === ok[ok.length - 1].change);
+  const bestNames = joinNames(best.map((r) => r.symbol));
+  const worstNames = joinNames(worst.map((r) => r.symbol));
+  const hi = ok[0].change;
+  const lo = ok[ok.length - 1].change;
+  const ups = ok.filter((r) => r.change > 0).length;
+  const downs = ok.filter((r) => r.change < 0).length;
+  const n = ok.length;
+  if (hi === lo) return hi === 0 ? null : { pre: `All ${n} tracked tokens `, hl: `${hi > 0 ? 'rose' : 'fell'} ${pct(Math.abs(hi), { signed: false })}`, post: ` over ${period}` };
+  if (ups === 0 && downs > 0) {
+    return { pre: `${downs === n ? `All ${n} tracked tokens fell` : 'No tracked token rose'} over ${period}; `, hl: `${worstNames} fell most (${pct(lo)})`, post: hi < 0 ? `, ${bestNames} least (${pct(hi)})` : '' };
+  }
+  if (downs === 0 && ups > 0) {
+    return { pre: `${ups === n ? `All ${n} tracked tokens rose` : 'No tracked token fell'} over ${period}; `, hl: `${bestNames} rose most (${pct(hi)})`, post: lo > 0 ? `, ${worstNames} least (${pct(lo)})` : '' };
+  }
+  return { pre: `${bestNames} `, hl: `rose most over ${period} (${pct(hi)})`, post: `; ${worstNames} fell most (${pct(lo)}). ${ups} of ${n} tracked tokens rose` };
+}
+
+/**
+ * Which tracked token is valued lowest and highest against a year of revenue.
+ * rows: [{ symbol, multiple, revenue30d }] where multiple = value ÷ annualized revenue (null when
+ * there is no revenue or no data). basisLabel: 'Market cap' or 'FDV'.
+ * Tokens without revenue are counted, not ranked: a multiple of nothing is not "cheap".
+ */
+export function tokenValuationTakeaway(rows, { basisLabel = 'Market cap' } = {}) {
+  const all = rows || [];
+  const valid = all.filter((r) => isNum(r.multiple) && r.multiple > 0).sort((a, b) => a.multiple - b.multiple);
+  const zero = all.filter((r) => r.revenue30d === 0).length;
+  const tail = zero ? `. ${zero} of the ${all.length} record no protocol revenue, so they have no multiple` : '';
+  if (valid.length >= 2) {
+    const low = valid[0];
+    const high = valid[valid.length - 1];
+    if (ratio(low.multiple) === ratio(valid[1].multiple)) {
+      return { pre: `${low.symbol} and ${valid[1].symbol} share `, hl: `the lowest ${basisLabel.toLowerCase()} ÷ revenue (${ratio(low.multiple)})`, post: ` of the ${valid.length} tracked tokens with revenue${tail}` };
+    }
+    return { pre: `${low.symbol} has `, hl: `the lowest ${basisLabel.toLowerCase()} ÷ revenue (${ratio(low.multiple)})`, post: ` of the ${valid.length} tracked tokens with revenue; ${high.symbol} the highest (${ratio(high.multiple)})${tail}` };
+  }
+  if (valid.length === 1) {
+    return { pre: `${valid[0].symbol} is `, hl: 'the only tracked token with a revenue multiple', post: ` (${basisLabel.toLowerCase()} ÷ annualized revenue: ${ratio(valid[0].multiple)})${tail}` };
+  }
+  return null;
+}
+
+// ---------- Size measures and definitions ----------
+
+/**
+ * Protocols are sized by different measures (TVL, tokenized assets, open interest), so the
+ * headline names the largest within each measure and never ranks across them.
+ * rows: [{ name, kind, label, value }].
+ */
+export function sizeTakeaway(rows) {
+  const ok = (rows || []).filter((r) => r.kind && isNum(r.value) && r.value > 0);
+  if (!ok.length) return null;
+  const order = ['tvl', 'tokenized', 'openInterest'];
+  const groups = order.map((k) => ok.filter((r) => r.kind === k).sort((a, b) => b.value - a.value)).filter((g) => g.length);
+  if (!groups.length) return null;
+  const say = (g) => `${g[0].name} by ${g[0].label === 'TVL' ? 'TVL' : g[0].label.toLowerCase()} (${usd(g[0].value)})`;
+  if (groups.length === 1) {
+    const g = groups[0];
+    return g.length > 1
+      ? { pre: `${g[0].name} is the largest tracked protocol by ${g[0].label === 'TVL' ? 'TVL' : g[0].label.toLowerCase()}, `, hl: `${usd(g[0].value)}`, post: `, ahead of ${g[1].name} (${usd(g[1].value)})` }
+      : { pre: `${g[0].name}: `, hl: `${usd(g[0].value)} of ${g[0].label === 'TVL' ? 'TVL' : g[0].label.toLowerCase()}`, post: '' };
+  }
+  return { pre: 'Three kinds of size, not one ranking. Largest of each: '.replace('Three', ['', 'One', 'Two', 'Three'][groups.length]), hl: say(groups[0]), post: `, ${groups.slice(1).map(say).join(', ')}` };
+}
+
+/** How much of a protocol's revenue DefiLlama counts as reaching token holders. */
+export function holdersTakeaway(name, symbol, revenue, holders) {
+  const r = revenue?.total30d;
+  const hr = holders?.total30d;
+  const who = symbol ? `${symbol} holders` : 'token holders';
+  if (!isNum(r)) return null;
+  if (r === 0) return { pre: `${name} records `, hl: 'no protocol revenue', post: `, so nothing reaches ${who}` };
+  if (!isNum(hr)) return { pre: 'DefiLlama has ', hl: 'no holders-revenue figure', post: ` for ${name}, so the share reaching ${who} is unknown` };
+  if (hr === 0) return { pre: '', hl: `None of ${name}’s revenue`, post: ` reaches ${who}, as DefiLlama counts it` };
+  const share = (hr / r) * 100;
+  if (share >= 99.5) return { pre: '', hl: `All of ${name}’s revenue`, post: ` reaches ${who}, as DefiLlama counts it` };
+  return { pre: '', hl: `${pct(share, { signed: false, digits: 0 })} of ${name}’s revenue`, post: ` reaches ${who}, as DefiLlama counts it` };
+}
+
+// ---------- Unlocks across tracked tokens ----------
+
+/**
+ * rows: [{ symbol, status, pct12m, unknown12m, events12m }] where pct12m is the share of
+ * circulating supply due to unlock in the next 12 months (null when no amount is published).
+ * Counts what is known and what isn't; it never treats "unconfirmed" as "nothing to unlock".
+ */
+export function unlockOverviewTakeaway(rows) {
+  const all = rows || [];
+  if (!all.length) return null;
+  const sized = all.filter((r) => isNum(r.pct12m) && r.pct12m > 0).sort((a, b) => b.pct12m - a.pct12m);
+  const unconfirmed = all.filter((r) => r.status === 'unconfirmed').length;
+  const none = all.filter((r) => r.status === 'none').length;
+  const unsized = all.filter((r) => r.events12m > 0 && !isNum(r.pct12m)).length;
+  const tail = [
+    unsized ? `${unsized} more ${unsized === 1 ? 'has' : 'have'} dated unlocks of unpublished size` : null,
+    none ? `${none} ${none === 1 ? 'has' : 'have'} nothing left to unlock` : null,
+    unconfirmed ? `${unconfirmed} of ${all.length} publish no schedule that could be confirmed` : null,
+  ].filter(Boolean).join('; ');
+  const fmt = (v) => `${Number(v.toPrecision(v >= 10 ? 3 : 2))}%`;
+  if (sized.length) {
+    const a = sized[0];
+    return { pre: `${a.symbol} has the most supply due to unlock in the next 12 months with a published amount: `, hl: `${fmt(a.pct12m)} of its circulating supply`, post: `${a.unknown12m ? ' (plus tranches of unpublished size)' : ''}${tail ? `. ${tail[0].toUpperCase()}${tail.slice(1)}` : ''}` };
+  }
+  if (unconfirmed === all.length) return { pre: 'None of the tracked tokens ', hl: 'publishes an unlock schedule', post: ' that could be confirmed' };
+  return tail ? { pre: '', hl: 'No tracked token has a dated unlock of published size', post: ` in the next 12 months. ${tail[0].toUpperCase()}${tail.slice(1)}` } : null;
 }

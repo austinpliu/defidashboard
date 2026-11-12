@@ -14,15 +14,18 @@ import {
   DL, fetchGlobal, buildMarket, buildScreener, fetchProtocolRaw, buildProtocolCore, resolveSlug,
   childSlugs, familyIds, poolsForProtocol, hacksForProtocol, fetchChainHistory, fetchStableHistory, fetchLlamaCoin,
 } from './lib/defillama.mjs';
-import { fetchCoinRaw, buildToken, applyLlamaFallback, searchCoin } from './lib/coingecko.mjs';
+import { fetchCoinRaw, buildToken, applyLlamaFallback, searchCoin, fetchPriceSnapshot, applySnapshot, CG } from './lib/coingecko.mjs';
 import { fetchNetworkMap, fetchTokenPools } from './lib/dex.mjs';
 import { spacesFromSources, fetchProposals } from './lib/governance.mjs';
-import { fetchFeed, feedItems } from './lib/feeds.mjs';
+import { fetchFeed, feedItems, topicsOf } from './lib/feeds.mjs';
 import { fetchCoinMarkets, buildCoinRows, fetchPredictionEvents, buildPredictionEvents, predictionProtocols } from './lib/markets.mjs';
 import { probeEmissionsRepo, EMISSIONS_REPO, loadManualUnlocks, buildTokenUnlocks } from './lib/unlocks.mjs';
 import { sourceRecord, derivedRecord, carryForward } from './lib/sources.mjs';
 import { fetchWeeklyPrices, fundamentalsInputs } from './lib/fundamentals.mjs';
-import { roundSmart, num, slugify, normSeries, dailySeries, trimDays, compactSeries } from './lib/util.mjs';
+import { valuationRatios, valuationSources } from './lib/valuation.mjs';
+import { tokenizedAssets, openInterestFor, sizeMeasures, feeDefinitions } from './lib/size.mjs';
+import { unlockSize, sizeTokenUnlocks, sizeText, unlockSizeSource } from './lib/unlock-size.mjs';
+import { roundSmart, num, slugify, normSeries, dailySeries, trimDays, compactSeries, firstSentences } from './lib/util.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const OUT = process.env.DATA_OUT_DIR || join(ROOT, 'site', 'data');
@@ -185,6 +188,9 @@ async function main() {
   const protocolList = raw.protocols.ok ? raw.protocols.data : null;
   const fees30dById = new Map((raw.fees.ok ? raw.fees.data.protocols || [] : []).map((p) => [String(p.defillamaId ?? p.id), num(p.total30d)]));
   const yieldsSrc = sourceRecord({ name: 'DefiLlama', label: 'Yield pools', page: `${DL.site}/yields`, res: raw.pools });
+  const oiSrc = sourceRecord({ name: 'DefiLlama', label: 'Perps open interest (all venues)', page: `${DL.site}/open-interest`, res: raw.openInterest });
+  const defsSrc = sourceRecord({ name: 'DefiLlama', label: 'What DefiLlama counts as fees, revenue and holders revenue, per sub-protocol', page: `${DL.site}/fees`, res: raw.fees });
+  if (!raw.openInterest.ok) problem('warn', `DefiLlama open interest failed (${raw.openInterest.error}); perps venues fall back to TVL as their size measure this run`);
   const hacksSrc = sourceRecord({ name: 'DefiLlama', label: 'Hacks database', page: `${DL.site}/hacks`, res: raw.hacks, note: raw.hacks.ok ? undefined : 'DefiLlama lists /hacks as a Pro (paid) endpoint; the free host refused it.' });
 
   const protocols = await mapLimit(entries, 2, async (entry) => {
@@ -226,6 +232,12 @@ async function main() {
       }
     } else if (!core.tvl?.series?.length && core.tvl) {
       core.tvl.unavailable = core.tvl.unavailable || `DefiLlama reports no TVL history for ${entry.name}.`;
+    }
+    // DefiLlama sometimes gives a parent the description of one of its products (Ondo Finance
+    // carries the text for its Treasury-fund token). Say so, instead of passing it off as the whole.
+    if (core.about?.description && kidsAll.length > 1) {
+      const same = kidsAll.filter((k) => k.description && firstSentences(k.description, 2) === core.about.description);
+      if (same.length === 1) core.about.descriptionOf = { name: same[0].name, slug: same[0].slug, of: kidsAll.length };
     }
     // Parent protocols carry no category/chains of their own; use their children's.
     if (core.about && protocolList) {
@@ -286,7 +298,10 @@ async function main() {
     doc.sources['dl-hacks'] = hacksSrc;
     doc.hacks = hacks ? { list: hacks, src: 'dl-hacks' } : { unavailable: hacksSrc.error, note: hacksSrc.note, src: 'dl-hacks' };
 
-    return { entry, doc, slugs };
+    // what the size measures and fee definitions are matched on (see step 8b)
+    const kidSlugs = new Set(kidsAll.map((k) => k.slug));
+    const rwaKidSlugs = new Set(kidsAll.filter((k) => k.category === 'RWA').map((k) => k.slug));
+    return { entry, doc, slugs, match: { parentIds, ids, slugs: new Set([slug, ...kidSlugs]) }, rwaKidSlugs };
   });
 
   // 3. Tokens (CoinGecko, spaced out to respect the keyless rate limit) -----
@@ -330,6 +345,23 @@ async function main() {
     token.generatedAt = new Date().toISOString();
     tokens.push(token);
     job.protocol.token = token;
+  }
+
+  // 3b. One price snapshot for every tracked token ---------------------------
+  // The per-token requests above are spaced out over several minutes, and the market list
+  // further down is another request again, so the same token used to show slightly different
+  // prices in different tables. This single request is the one source for every tracked
+  // token's price, market cap, FDV, volume and price changes, everywhere on the site.
+  let snapshot = { ok: false, byId: new Map(), source: null };
+  if (tokens.length) {
+    snapshot = await fetchPriceSnapshot(http, tokens.map((t) => t.id));
+    probe('price snapshot', { ok: snapshot.ok, data: [...snapshot.byId.values()] });
+    const missed = [];
+    for (const t of tokens) {
+      if (!applySnapshot(t, snapshot.byId.get(t.id), snapshot.source, { page: `${CG.site}/${t.id}` })) missed.push(t.id);
+    }
+    if (!snapshot.ok) problem('warn', `CoinGecko price snapshot failed (${snapshot.source.error}), so tracked tokens show the prices fetched one by one a few minutes apart`);
+    else if (missed.length) problem('info', `The price snapshot has no row for ${missed.join(', ')}; ${missed.length === 1 ? 'that token keeps' : 'those tokens keep'} the price from ${missed.length === 1 ? 'its' : 'their'} own request`);
   }
 
   // 4. DEX liquidity (GeckoTerminal, DexScreener fallback) --------------------
@@ -494,7 +526,9 @@ async function main() {
     const unconfirmed = [];
     for (const p of protocols) {
       if (!p.token) continue;
-      const u = buildTokenUnlocks(manual.tokens[p.token.id], { supply: p.token.supply });
+      // each dated unlock also gets a size: dollars at the snapshot price, share of circulating supply, days of volume
+      const u = sizeTokenUnlocks(buildTokenUnlocks(manual.tokens[p.token.id], { supply: p.token.supply }), p.token.market || {}, p.token.supply || {});
+      const sizeCtx = { price: p.token.market?.price, circulating: p.token.supply?.circulating, volume24h: p.token.market?.volume24h };
       const sym = p.entry.symbol || p.token.symbol || p.entry.name;
       const srcKey = `manual-unlocks-${p.token.id}`;
       const first = u.sources[0];
@@ -504,6 +538,13 @@ async function main() {
       p.token.unlocks = { ...u, src: srcRec ? srcKey : null };
       p.doc.unlocks = { ...u, src: srcRec ? srcKey : null };
       if (srcRec) { p.token.sources[srcKey] = srcRec; p.doc.sources[srcKey] = srcRec; catSources[srcKey] = srcRec; }
+      if (srcRec && u.sizedAt) {
+        const calc = unlockSizeSource(srcKey, p.token.market?.src || 'cg-coin');
+        p.token.sources['calc-unlock-size'] = calc;
+        p.doc.sources['calc-unlock-size'] = calc;
+        p.token.unlocks.sizeSrc = 'calc-unlock-size';
+        p.doc.unlocks.sizeSrc = 'calc-unlock-size';
+      }
       if (u.status === 'unconfirmed') unconfirmed.push(sym);
       // Catalysts: dated events. Tranches that fall in the same month (or on the same day) for
       // one token become one item, and monthly schedules show their next 6 months.
@@ -544,6 +585,10 @@ async function main() {
           share: known.length && known.every((e) => e.share != null) ? known.reduce((sum, e) => sum + e.share, 0) : null,
           partialAmount: known.length > 0 && known.length < evs.length,
           manual: true,
+          // how big it is (calculated; null when the docs publish no amount)
+          size: known.length ? unlockSize(total, sizeCtx) : null,
+          sizeText: known.length ? sizeText(unlockSize(total, sizeCtx)) : '',
+          sizeSrc: known.length && p.token.market?.src ? p.token.market.src : null,
         });
       }
     }
@@ -564,34 +609,21 @@ async function main() {
     } else {
       doc.token = { unavailable: 'No token configured for this protocol' };
     }
-    const fees30 = num(doc.fees?.total30d);
-    const rev30 = num(doc.revenue?.total30d);
-    const mcap = num(t?.market?.marketCap);
-    const fdv = num(t?.market?.fdv);
-    const tvl = num(doc.tvl?.value);
-    const annual = (x) => (x != null ? (x * 365) / 30 : null);
-    const ratio = (a, b) => (a != null && b != null && b > 0 ? roundSmart(a / b) : null);
-    doc.derived = {
-      annualizedFees: { value: roundSmart(annual(fees30)), src: 'calc-annual-fees' },
-      annualizedRevenue: { value: roundSmart(annual(rev30)), src: 'calc-annual-revenue' },
-      mcapToFees: { value: ratio(mcap, annual(fees30)), src: 'calc-mcap-fees' },
-      mcapToRevenue: { value: ratio(mcap, annual(rev30)), src: 'calc-mcap-revenue' },
-      fdvToFees: { value: ratio(fdv, annual(fees30)), src: 'calc-fdv-fees' },
-      mcapToTvl: { value: ratio(mcap, tvl), src: 'calc-mcap-tvl' },
-      revenueShare: { value: fees30 && rev30 != null ? roundSmart((rev30 / fees30) * 100) : null, src: 'calc-revenue-share' },
-    };
-    doc.sources['calc-annual-fees'] = derivedRecord({ label: 'Annualized fees', from: ['dl-fees'], formula: 'Last 30 days of fees × 365 ÷ 30' });
-    doc.sources['calc-annual-revenue'] = derivedRecord({ label: 'Annualized revenue', from: ['dl-revenue'], formula: 'Last 30 days of revenue × 365 ÷ 30' });
-    doc.sources['calc-mcap-fees'] = derivedRecord({ label: 'Market cap ÷ annualized fees', from: ['cg-coin', 'dl-fees'], formula: 'CoinGecko market cap ÷ (30-day fees × 365 ÷ 30)' });
-    doc.sources['calc-mcap-revenue'] = derivedRecord({ label: 'Market cap ÷ annualized revenue', from: ['cg-coin', 'dl-revenue'], formula: 'CoinGecko market cap ÷ (30-day revenue × 365 ÷ 30)' });
-    doc.sources['calc-fdv-fees'] = derivedRecord({ label: 'Fully diluted value ÷ annualized fees', from: ['cg-coin', 'dl-fees'], formula: 'CoinGecko FDV ÷ (30-day fees × 365 ÷ 30)' });
-    doc.sources['calc-mcap-tvl'] = derivedRecord({ label: 'Market cap ÷ TVL', from: ['cg-coin', 'dl-protocol'], formula: 'CoinGecko market cap ÷ DefiLlama TVL' });
-    doc.sources['calc-revenue-share'] = derivedRecord({ label: 'Revenue as % of fees', from: ['dl-fees', 'dl-revenue'], formula: '30-day revenue ÷ 30-day fees × 100' });
+    // What the market pays for a year of fees, of revenue, and of revenue that reaches holders.
+    // Market cap and FDV come from the price snapshot, so every ratio uses the same price.
+    doc.derived = valuationRatios({
+      fees30: doc.fees?.total30d, rev30: doc.revenue?.total30d, hold30: doc.holdersRevenue?.total30d,
+      mcap: t?.market?.marketCap, fdv: t?.market?.fdv, tvl: doc.tvl?.value,
+    });
+    Object.assign(doc.sources, valuationSources(t?.market?.src || 'cg-coin'));
 
-    doc.news = feedItemsAll
+    const allNews = feedItemsAll
       .filter((i) => i.protocols.includes(doc.slug))
-      .sort((a, b) => Date.parse(b.date) - Date.parse(a.date))
-      .slice(0, 12);
+      .sort((a, b) => Date.parse(b.date) - Date.parse(a.date));
+    doc.news = allNews.slice(0, 12);
+    // the page lists the latest 12; its headline counts them all
+    doc.newsTotal = allNews.length;
+    doc.newsSince = allNews.length ? allNews[allNews.length - 1].date : null;
     for (const i of doc.news) doc.sources[i.src] = catSources[i.src];
   }
 
@@ -605,6 +637,49 @@ async function main() {
       { src: 'dl-yields', paths: ['yields'] },
       { src: 'snapshot', paths: ['governance'] },
     ]);
+  }
+
+  // 8b. A size measure that fits each kind of protocol, and DefiLlama's fee definitions -----
+  // Runs after the carry-forward above, so a stale TVL is still a TVL here.
+  for (const p of protocols) {
+    const doc = p.doc;
+    const category = doc.about?.category || null;
+    const prev = readJSON(join(OUT, 'protocols', `${doc.slug}.json`));
+    const fresh = (iso) => iso && Date.now() - Date.parse(iso) < 48 * 36e5;
+    // a measure whose source failed this run is kept from the last run for up to 48 hours, marked stale
+    const keep = (kind, src) => {
+      const old = prev?.size?.measures?.find((m) => m.kind === kind);
+      const at = old?.stale?.lastGoodAt || old?.asOf;
+      return old && fresh(at) ? { ...old, stale: { lastGoodAt: at, reason: src.error } } : null;
+    };
+    let tok = category === 'RWA' ? tokenizedAssets(raw.pools, p.slugs) : null;
+    if (tok) {
+      // only real-world-asset sub-protocols belong in "not listed" (a perps venue has nothing to tokenize)
+      tok.notListed = tok.notListed.filter((s) => p.rwaKidSlugs.has(s));
+      tok.asOf = yieldsSrc.fetchedAt;
+    }
+    const oi = openInterestFor(raw.openInterest, p.match);
+    if (oi) oi.asOf = oiSrc.fetchedAt;
+    const size = sizeMeasures({ category, tvl: doc.tvl, borrowed: doc.chainTvl?.borrowed, tokenized: tok, openInterest: oi });
+    for (const m of size.measures) {
+      if (m.kind === 'tokenized') m.asOf = tok.asOf;
+      if (m.kind === 'openInterest') m.asOf = oi.asOf;
+      if (m.kind === 'tvl' || m.kind === 'borrowed') m.asOf = doc.sources['dl-protocol']?.stale?.lastGoodAt || doc.sources['dl-protocol']?.fetchedAt || null;
+    }
+    const carried = [!raw.pools.ok && category === 'RWA' ? keep('tokenized', yieldsSrc) : null, !raw.openInterest.ok ? keep('openInterest', oiSrc) : null].filter(Boolean);
+    if (carried.length) {
+      const all = [...size.measures, ...carried];
+      const want = category === 'RWA' ? 'tokenized' : category === 'Derivatives' ? 'openInterest' : null;
+      const first = all.find((m) => m.kind === want) || all.find((m) => m.kind === size.primary) || all[0];
+      size.measures = [first, ...all.filter((m) => m !== first)];
+      size.primary = first.kind;
+      delete size.unavailable;
+    }
+    doc.size = size;
+    if (size.measures.some((m) => m.kind === 'openInterest')) doc.sources['dl-open-interest'] = oiSrc;
+    const defs = feeDefinitions(raw.fees, p.match);
+    doc.definitions = defs ? { list: defs, src: 'dl-fees-overview' } : { unavailable: raw.fees.ok ? 'DefiLlama publishes no fee definitions for this protocol.' : raw.fees.error, src: 'dl-fees-overview' };
+    doc.sources['dl-fees-overview'] = defsSrc;
   }
 
   // 9. Catalysts ---------------------------------------------------------------
@@ -630,6 +705,7 @@ async function main() {
       symbols: owner ? [owner.entry.symbol].filter(Boolean) : [],
       group: owner?.entry.group,
       title: x.title,
+      topics: topicsOf(x.title),
       summary: summary.trim(),
       url: x.url,
       sourceName: `Snapshot · ${x.spaceName}`,
@@ -640,6 +716,9 @@ async function main() {
     };
   });
   if (gov.source) catSources.snapshot = gov.source;
+  // unlock sizes are calculated from the price snapshot, so Catalysts cites it too
+  if (snapshot.ok && unlockItems.some((i) => i.sizeSrc === 'cg-snapshot')) catSources['cg-snapshot'] = snapshot.source;
+  for (const i of unlockItems) if (i.sizeSrc && !catSources[i.sizeSrc]) i.sizeSrc = null;
   const scheduled = protocols.flatMap((p) =>
     (p.doc.hallmarks?.list || [])
       .filter((h) => h.ts * 1000 > now)
@@ -662,14 +741,18 @@ async function main() {
   const watchSet = new Set(watchMeta.map((w) => w.slug));
   const catalystItems = [...govItems, ...unlockItems, ...scheduled, ...feedItemsAll.filter((i) => i.protocols.some((s) => watchSet.has(s)))]
     .sort((a, b) => Date.parse(a.date) - Date.parse(b.date));
-  const headlines = feedItemsAll
+  const allHeadlines = feedItemsAll
     .filter((i) => i.baseType === 'news' && (i.defi || i.protocols.length))
-    .sort((a, b) => Date.parse(b.date) - Date.parse(a.date))
-    .slice(0, 30);
+    .sort((a, b) => Date.parse(b.date) - Date.parse(a.date));
+  const headlines = allHeadlines.slice(0, 30);
   const catalysts = {
     generatedAt: new Date().toISOString(),
     items: catalystItems,
     headlines,
+    // the list is capped at 30; these count every matching headline so the site can say how many there were
+    headlinesTotal: allHeadlines.length,
+    headlinesSince: allHeadlines.length ? allHeadlines[allHeadlines.length - 1].date : null,
+    headlinesOutlets: new Set(allHeadlines.map((i) => i.sourceName)).size,
     unavailable: unlockNoteParts.filter(Boolean).map((reason) => ({ type: 'unlock', title: 'Token unlocks: unconfirmed for some tokens', reason })),
     protocols: watchMeta.map(({ slug, name, symbol, group }) => ({ slug, name, symbol, group })),
     sources: catSources,
@@ -681,7 +764,7 @@ async function main() {
   const coinRes = await fetchCoinMarkets(http);
   probe('coin markets', coinRes.all);
   probe('coin markets (DeFi)', coinRes.defi);
-  const freshCoins = buildCoinRows(coinRes.all, coinRes.defi, new Set(tokens.map((t) => t.id)));
+  const freshCoins = buildCoinRows(coinRes.all, coinRes.defi, new Set(tokens.map((t) => t.id)), snapshot.ok ? snapshot.byId : null);
   const coinsSrc = freshCoins ? coinRes.sources['cg-markets'] : { ...coinRes.sources['cg-markets'], ok: false, error: coinRes.sources['cg-markets'].error || 'Unexpected response shape' };
   const prevCoins = readJSON(join(OUT, 'coins.json'));
   const coinCarry = carryForward({ freshData: freshCoins, freshSource: coinsSrc, prevData: prevCoins?.rows ?? null, prevSource: prevCoins?.sources?.['cg-markets'] });
@@ -690,7 +773,9 @@ async function main() {
   const coinsDoc = {
     generatedAt: new Date().toISOString(),
     rows: coinCarry.data,
-    sources: { ...coinRes.sources, 'cg-markets': coinCarry.source },
+    sources: { ...coinRes.sources, 'cg-markets': coinCarry.source, ...(snapshot.ok ? { 'cg-snapshot': snapshot.source } : {}) },
+    // tracked tokens' rows carry the snapshot's numbers, so a token never shows two prices on one page
+    snapshotRows: coinCarry.data ? coinCarry.data.filter((r) => r.snapshot).length : 0,
     ...(coinCarry.data ? {} : { unavailable: coinsSrc.error }),
   };
 
@@ -718,6 +803,8 @@ async function main() {
   // 10. Index (nav, search, watchlist strip) ----------------------------------
   const index = {
     generatedAt: new Date().toISOString(),
+    // the one request every tracked token's price, market cap and FDV come from (null if it failed)
+    priceSnapshot: snapshot.ok ? snapshot.source : null,
     protocols: protocols.map(({ entry, doc, token }) => ({
       slug: doc.slug,
       name: entry.name,
@@ -734,10 +821,35 @@ async function main() {
       tvlSpark: doc.tvl?.series ? doc.tvl.series.slice(-30).map((p) => p[1]) : [],
       fees30d: doc.fees?.total30d ?? null,
       revenue30d: doc.revenue?.total30d ?? null,
+      holdersRevenue30d: doc.holdersRevenue?.total30d ?? null,
+      // why a figure is missing (shown on hover instead of a guess)
+      feesNote: doc.fees?.unavailable || null,
+      revenueNote: doc.revenue?.unavailable || null,
+      holdersRevenueNote: doc.holdersRevenue?.unavailable || null,
+      // calculated ratios (formulas in each protocol file's sources): value ÷ (30-day total × 365 ÷ 30)
+      valuation: Object.fromEntries(Object.entries(doc.derived || {}).map(([k, v]) => [k, v.value])),
+      // upcoming unlocks, hand-checked from the project's docs, with calculated sizes
+      unlock: token?.unlocks ? { status: token.unlocks.status, summary: token.unlocks.summary || null, lastChecked: token.unlocks.lastChecked || null, next: token.unlocks.next || null, next12m: token.unlocks.next12m || null, vesting: token.unlocks.vesting || [], source: token.unlocks.sources?.[0] || null, sized: Boolean(token.unlocks.sizedAt) } : null,
+      // size in the measure that fits this kind of protocol (TVL, tokenized assets or open interest)
+      size: doc.size || null,
+      feesAre: doc.definitions?.list?.[0] ? { from: doc.definitions.list[0].name, shareOfFees: doc.definitions.list[0].shareOfFees, fees: doc.definitions.list[0].methodology.Fees || null, revenue: doc.definitions.list[0].methodology.Revenue || null, holders: doc.definitions.list[0].methodology.HoldersRevenue || null } : null,
+      sizeSources: { 'dl-protocol': doc.sources['dl-protocol'] || null, 'dl-yields': doc.sources['dl-yields'] || null, 'dl-open-interest': doc.sources['dl-open-interest'] || null },
+      srcDefinitions: doc.sources['dl-fees-overview'] || null,
+      srcChart: token?.series?.src ? token.sources[token.series.src] || null : null,
+      srcFees: doc.sources['dl-fees'] || null,
+      srcRevenue: doc.sources['dl-revenue'] || null,
+      srcHolders: doc.sources['dl-holders-revenue'] || null,
       price: token?.market?.price ?? null,
       priceChange24h: token?.market?.change24h ?? null,
       priceChange7d: token?.market?.change7d ?? null,
+      priceChange30d: token?.market?.change30d ?? null,
+      priceChange90d: token?.market?.change90d ?? null,
+      priceChange1y: token?.market?.change1y ?? null,
       mcap: token?.market?.marketCap ?? null,
+      fdv: token?.market?.fdv ?? null,
+      volume24h: token?.market?.volume24h ?? null,
+      // true when this token's numbers come from the shared snapshot (one request for all tokens)
+      priceFromSnapshot: token?.market?.src === 'cg-snapshot',
       priceSpark: token?.market?.sparkline7d || [],
       srcTvl: doc.sources['dl-protocol'],
       srcPrice: token ? token.sources[token.market?.src] || token.sources['cg-coin'] : null,

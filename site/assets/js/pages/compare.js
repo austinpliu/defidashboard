@@ -13,6 +13,7 @@ const METRICS = {
   tvl: { label: 'TVL', short: 'TVL', get: (d) => d.tvl?.series, src: (d) => d.sources?.[d.tvl?.src], fmt: usd },
   fees: { label: 'Fees (rolling 30-day total)', short: 'fees', get: (d) => (d.fees?.series ? rollingSum(d.fees.series, 30) : null), src: (d) => d.sources?.['dl-fees'], fmt: usd },
   revenue: { label: 'Revenue (rolling 30-day total)', short: 'revenue', get: (d) => (d.revenue?.series ? rollingSum(d.revenue.series, 30) : null), src: (d) => d.sources?.['dl-revenue'], fmt: usd },
+  holders: { label: 'Holders revenue (rolling 30-day total)', short: 'holders revenue', get: (d) => (d.holdersRevenue?.series?.length ? rollingSum(d.holdersRevenue.series, 30) : null), src: (d) => d.sources?.['dl-holders-revenue'], fmt: usd },
   price: { label: 'Token price', short: 'token price', get: (d) => d.tokenSeries?.price, src: (d) => d.sources?.[d.tokenSeries?.src], fmt: usd },
   mcap: { label: 'Token market cap', short: 'market cap', get: (d) => d.tokenSeries?.marketCap, src: (d) => d.sources?.[d.tokenSeries?.src], fmt: usd },
 };
@@ -42,13 +43,13 @@ export async function render(root, { query }) {
   let mode = query.get('mode') === 'abs' ? 'abs' : 'index';
   let range = [90, 365].includes(Number(query.get('range'))) ? Number(query.get('range')) : 365;
 
-  root.append(band({ n: '04', tag: 'Section 04 · Compare', title: 'Side by side', sub: 'Pick 2 to 5 protocols (each with its token). Overlay their TVL, fees, revenue, token price or market cap, and compare valuation metrics in one table. The link in your address bar saves this view.' }));
+  root.append(band({ n: '04', tag: 'Section 04 · Compare', title: 'Side by side', sub: 'Pick 2 to 5 protocols (each with its token). Overlay their TVL, fees, revenue, holders revenue, token price or market cap, and compare valuation metrics in one table. The link in your address bar saves this view.' }));
 
   const picker = h('div', { class: 'picker', role: 'group', 'aria-label': 'Protocols to compare' });
   const controls = h('div', { class: 'filters stacked' },
     h('div', { class: 'group' }, h('label', { class: 'lbl' }, 'Protocols'), picker),
     h('div', { class: 'group' }, h('label', { class: 'lbl' }, 'Show'),
-    segmented(Object.entries(METRICS).map(([k, m]) => ({ value: k, label: m.short === 'token price' ? 'Price' : m.short === 'market cap' ? 'Mkt cap' : m.short[0].toUpperCase() + m.short.slice(1) })), metric, (v) => { metric = v; update(); }, 'Metric'),
+    segmented(Object.entries(METRICS).map(([k, m]) => ({ value: k, label: m.short === 'token price' ? 'Price' : m.short === 'market cap' ? 'Mkt cap' : m.short === 'holders revenue' ? 'To holders' : m.short[0].toUpperCase() + m.short.slice(1) })), metric, (v) => { metric = v; update(); }, 'Metric'),
     segmented([{ value: 'index', label: 'Growth (=100)' }, { value: 'abs', label: 'Absolute' }], mode, (v) => { mode = v; update(); }, 'Units'),
     segmented([{ value: 90, label: '90D' }, { value: 365, label: '1Y' }], range, (v) => { range = v; update(); }, 'Range')));
   root.append(controls);
@@ -111,7 +112,7 @@ export async function render(root, { query }) {
       chartHolder.replaceChildren(chartCard({ kicker: 'Overlay', fallback: title, unavailableReason: `None of the selected protocols has ${M.short} data.` }));
       card = null;
     } else if (!card || !card.isConnected) {
-      card = chartCard({ kicker: 'Overlay', termKey: mode === 'index' ? 'indexed' : metric === 'tvl' ? 'tvl' : metric === 'fees' ? 'fees' : metric === 'revenue' ? 'revenue' : metric === 'price' ? 'price' : 'marketCap', take, title, size: 'tall', build, legend: [], src: srcs, csvName: `compare-${metric}`, table });
+      card = chartCard({ kicker: 'Overlay', termKey: mode === 'index' ? 'indexed' : metric === 'tvl' ? 'tvl' : metric === 'fees' ? 'fees' : metric === 'revenue' ? 'revenue' : metric === 'holders' ? 'holdersRevenue' : metric === 'price' ? 'price' : 'marketCap', take, title, size: 'tall', build, legend: [], src: srcs, csvName: `compare-${metric}`, table });
       chartHolder.replaceChildren(card);
       const { mountPending } = await import('../cards.js');
       mountPending();
@@ -131,8 +132,8 @@ export async function render(root, { query }) {
       return {
         slug, name: meta.name, category: d.about?.category || '', chains: d.about?.chains || [],
         tvl: d.tvl?.value, tvl30: d.tvl?.change30d, tvl90: d.tvl?.change90d, tvl1y: d.tvl?.change1y,
-        fees30: d.fees?.total30d, rev30: d.revenue?.total30d, annRev: D.annualizedRevenue?.value,
-        mcap: mk.marketCap, fdv: mk.fdv, mcapFees: D.mcapToFees?.value, mcapRev: D.mcapToRevenue?.value, fdvFees: D.fdvToFees?.value, price30: mk.change30d,
+        fees30: d.fees?.total30d, rev30: d.revenue?.total30d, hold30: d.holdersRevenue?.total30d ?? null, annRev: D.annualizedRevenue?.value,
+        mcap: mk.marketCap, fdv: mk.fdv, mcapFees: D.mcapToFees?.value, mcapRev: D.mcapToRevenue?.value, mcapHold: D.mcapToHoldersRevenue?.value ?? null, fdvFees: D.fdvToFees?.value, fdvRev: D.fdvToRevenue?.value ?? null, price30: mk.change30d,
       };
     });
     tableHolder.replaceChildren(h('section', { class: 'card' },
@@ -149,17 +150,20 @@ export async function render(root, { query }) {
           { key: 'tvl1y', label: 'TVL 1y', num: true, fmt: delta, csv: (r) => r.tvl1y },
           { key: 'fees30', label: 'Fees 30d', num: true, fmt: (v) => usd(v), termKey: 'fees' },
           { key: 'rev30', label: 'Revenue 30d', num: true, fmt: (v) => usd(v), termKey: 'revenue' },
+          { key: 'hold30', label: 'To holders 30d', num: true, fmt: (v) => usd(v), termKey: 'holdersRevenue' },
           { key: 'annRev', label: 'Ann. revenue', num: true, fmt: (v) => usd(v), termKey: 'annualizedRevenue' },
           { key: 'mcap', label: 'Market cap', num: true, fmt: (v) => usd(v), termKey: 'marketCap' },
           { key: 'fdv', label: 'FDV', num: true, fmt: (v) => usd(v), termKey: 'fdv' },
           { key: 'mcapFees', label: 'Mcap ÷ fees', num: true, fmt: (v) => ratio(v), termKey: 'mcapToFees' },
           { key: 'mcapRev', label: 'Mcap ÷ revenue', num: true, fmt: (v) => ratio(v), termKey: 'mcapToRevenue' },
+          { key: 'mcapHold', label: 'Mcap ÷ holders rev.', num: true, fmt: (v) => ratio(v), termKey: 'mcapToHoldersRevenue' },
           { key: 'fdvFees', label: 'FDV ÷ fees', num: true, fmt: (v) => ratio(v), termKey: 'fdvToFees' },
+          { key: 'fdvRev', label: 'FDV ÷ revenue', num: true, fmt: (v) => ratio(v), termKey: 'fdvToRevenue' },
           { key: 'price30', label: 'Price 30d', num: true, fmt: delta, csv: (r) => r.price30 },
         ],
         rows,
       }),
-      h('p', { class: 'src' }, 'TVL, fees and revenue: DefiLlama. Market cap, FDV and price: CoinGecko. Ratios are calculated here: value ÷ (30-day total × 365 ÷ 30). Each protocol page lists the exact endpoints and fetch times.'),
+      h('p', { class: 'src' }, 'TVL, fees, revenue and holders revenue: DefiLlama. Market cap, FDV and price: CoinGecko (one price snapshot for all tokens). Ratios are calculated: value ÷ (30-day total × 365 ÷ 30); a dash means there is no revenue to divide by, or no data. Each protocol page lists the exact endpoints and fetch times.'),
       sourceLine(sel.filter((x) => x.d).flatMap((x) => [x.d.sources?.['dl-protocol']]).filter(Boolean).slice(0, 1))));
   }
 

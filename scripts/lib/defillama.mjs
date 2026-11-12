@@ -120,7 +120,7 @@ const BRIDGE_CATEGORIES = new Set(['Bridge', 'Canonical Bridge']);
 export async function fetchGlobal(http) {
   const get = (url, label) => http.json(url, { label });
   const [
-    protocols, chains, totalTvl, fees, revenue, dexs, stables, stableChart, pools, hacks, raises, emissions,
+    protocols, chains, totalTvl, fees, revenue, dexs, stables, stableChart, pools, hacks, raises, emissions, openInterest,
   ] = await Promise.all([
     get(`${DL.api}/protocols`, 'DefiLlama protocol list'),
     get(`${DL.api}/v2/chains`, 'DefiLlama chain TVL'),
@@ -134,8 +134,10 @@ export async function fetchGlobal(http) {
     get(`${DL.api}/hacks`, 'DefiLlama hacks (may be Pro-only)'),
     get(`${DL.api}/raises`, 'DefiLlama raises (may be Pro-only)'),
     get(`${DL.api}/emissions`, 'DefiLlama token unlocks (may be Pro-only)'),
+    // free and documented; perps trading volume (/overview/derivatives) is paid-only
+    get(`${DL.api}/overview/open-interest?excludeTotalDataChart=true&excludeTotalDataChartBreakdown=true`, 'DefiLlama perps open interest'),
   ]);
-  return { protocols, chains, totalTvl, fees, revenue, dexs, stables, stableChart, pools, hacks, raises, emissions };
+  return { protocols, chains, totalTvl, fees, revenue, dexs, stables, stableChart, pools, hacks, raises, emissions, openInterest };
 }
 
 // ---------- Overview (fees / revenue / dex volume) ----------
@@ -276,6 +278,9 @@ export function buildMarket(raw, extra) {
     revenue: overviewHeadline(raw.revenue, revSrc),
   };
 
+  // What the fee total is made of: a large part is not fees paid by DeFi users
+  if (raw.fees.ok && headline.fees) headline.fees.composition = feeComposition(raw.fees.data.protocols);
+
   // TVL by chain
   const chSrc = S('dl-chains', sourceRecord({ name: 'DefiLlama', label: 'TVL by chain', page: `${DL.site}/chains`, res: raw.chains }));
   let chains = { top: [], src: chSrc, unavailable: raw.chains.error };
@@ -406,6 +411,31 @@ export function buildMarket(raw, extra) {
     stablecoins: stableIssuers,
     sources,
   };
+}
+
+// Categories in DefiLlama's fee list whose "fees" are not paid by people using DeFi apps.
+export const NOT_USER_FEES = {
+  'Stablecoin Issuer': 'stablecoin issuers’ income on their reserves',
+  Chain: 'blockchains’ own transaction fees',
+};
+
+/**
+ * How much of the 30-day fee total comes from each of those categories. Shares are of what the
+ * listed entries add up to, which can differ a little from DefiLlama's published total.
+ */
+export function feeComposition(protocols = []) {
+  const by = new Map();
+  let listed = 0;
+  for (const p of protocols || []) {
+    const v = num(p?.total30d);
+    if (v === null || v <= 0) continue;
+    listed += v;
+    if (NOT_USER_FEES[p.category]) by.set(p.category, (by.get(p.category) || 0) + v);
+  }
+  if (!(listed > 0)) return null;
+  const parts = Object.keys(NOT_USER_FEES).filter((k) => by.get(k) > 0).map((k) => ({ key: k, label: NOT_USER_FEES[k], total30d: roundSmart(by.get(k)), share: roundSmart((by.get(k) / listed) * 100) }));
+  const other = listed - parts.reduce((s, p) => s + p.total30d, 0);
+  return { listedTotal30d: roundSmart(listed), parts, apps: { total30d: roundSmart(other), share: roundSmart((other / listed) * 100) } };
 }
 
 export function sumPegs(obj) {

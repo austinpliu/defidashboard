@@ -1,6 +1,6 @@
 # Progress
 
-_Updated as work happens. Last update: 5 Nov 2026 (session: category double counting fix, then the notes workspace)._
+_Updated as work happens. Last update: 12 Nov 2026 (session: content audit — price snapshot, token valuation, size measures, unlock sizes, headline fixes, catalysts)._
 
 ## Done
 - **Data pipeline** (`scripts/fetch-data.mjs` + `scripts/lib/`): DefiLlama, CoinGecko, DexScreener/GeckoTerminal, Snapshot and RSS feeds → `site/data/*.json`, with a source record and fetch time for every dataset. Polite pacing, retries, a rate-limit circuit breaker, a 22-minute time budget, and a 48-hour stale fallback. A run takes about 6 minutes and makes about 130 requests. In run 14, 122 of 128 succeeded. The 6 failures were all expected: two paid-only endpoints (402), "no holders-revenue data" for Ethena (400), and three GeckoTerminal rate limits on minor fallback chains (Berachain, Katana, NEAR), which the token pages mark with ✗ in their list of chains searched.
@@ -54,6 +54,16 @@ _Updated as work happens. Last update: 5 Nov 2026 (session: category double coun
     - Ondo's and Centrifuge's TVL history (DefiLlama has none), so their track record is "no data".
   - **To fill in by hand:** `site/config/value-accrual.json` (confirmed fee switches and buybacks) and `site/config/team-notes.json`. Both ship empty. See README › Fundamentals Checklist.
 - **Focus outline fix (Nov 2026):** the main content area no longer shows a blue outline when the router focuses it on load or page change; buttons, links and inputs keep theirs.
+
+- **Content audit (Nov 2026):** what each section lets you conclude, and the gaps closed in order.
+  - **One price snapshot per run:** a token shows the same price, market cap and FDV in every table.
+  - **Tokens tab:** 30d/90d/1y changes and FDV; a valuation table (fees, revenue, holders revenue, share kept, share to holders, value ÷ each, by market cap or FDV); a size table; an unlocks table.
+  - **Size that fits the protocol:** tokenized assets for RWA issuers (Ondo $2.4B, Centrifuge $669M on 12 Nov 2026), open interest for perps (Hyperliquid $6.6B), TVL elsewhere, loans outstanding for lenders. A "Like for like" card on protocol pages quotes DefiLlama's fee definitions.
+  - **Unlock sizes:** dollars today, share of circulating supply, days of volume, on the Tokens tab, token pages and Catalysts.
+  - **Headlines:** four rules that could state something false were fixed and tested; the Overview says what the fee total is made of.
+  - **Catalysts:** launches are only a protocol's when the headline names it; filters for dated events and token economics.
+  - **Tests:** 145 unit and pipeline tests.
+  - **Verified** by loading each page in a browser and checking displayed figures against their source links (details in the pull request).
 
 ## Not done / known gaps
 - **Notes, not yet:**
