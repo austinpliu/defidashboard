@@ -44,6 +44,15 @@ test('pipeline writes every file with sources and handles failures honestly', ()
     assert.equal(tokA.unlocks.events[0].tokens, 160000, 'share of supply × CoinGecko max supply');
     assert.equal(tokA.unlocks.events[0].precision, 'month', 'no invented day of the month');
     assert.ok(tokA.sources[tokA.unlocks.src].manual, 'marked as manually sourced');
+    // each tranche is sized from the snapshot: 160,000 tokens × $101, against 15M circulating and $90M of volume
+    assert.equal(tokA.unlocks.events[0].usd, 160000 * 101);
+    assert.equal(tokA.unlocks.events[0].pctCirculating, 1.07);
+    assert.equal(tokA.unlocks.events[0].daysOfVolume, 0.1796);
+    assert.equal(tokA.unlocks.next.tokens, 160000);
+    assert.equal(tokA.unlocks.next12m.tokens, 12 * 160000);
+    assert.equal(tokA.unlocks.next12m.unknown, 0);
+    assert.equal(tokA.sources['calc-unlock-size'].derived, true, 'sizes are marked as calculated');
+    assert.deepEqual(tokA.sources['calc-unlock-size'].from, [tokA.unlocks.src, 'cg-snapshot']);
     assert.equal(alpha.governance.proposals.length, 3);
     assert.ok(alpha.derived.mcapToFees.value > 0);
     assert.equal(alpha.sources['calc-mcap-fees'].derived, true);
@@ -124,6 +133,13 @@ test('pipeline writes every file with sources and handles failures honestly', ()
     assert.ok(cat.items.some((i) => i.type === 'governance-vote' && i.status === 'open'));
     assert.ok(cat.items.every((i) => i.url && i.src && cat.sources[i.src]), 'every catalyst has a link and a source');
     assert.equal(cat.items.filter((i) => i.type === 'unlock').length, 6, 'Catalysts shows the next 6 months of tranches, one item per month');
+    const unlockItem = cat.items.find((i) => i.type === 'unlock' && i.symbols.includes('ALP'));
+    assert.equal(unlockItem.size.usd, 160000 * 101, 'a catalyst unlock carries its size');
+    assert.match(unlockItem.sizeText, /^about \$16\.2M at today’s price · 1\.1% of circulating supply/);
+    assert.ok(cat.sources[unlockItem.sizeSrc].api.includes('ids='), 'and cites the price snapshot it was sized with');
+    const idx2 = read('index.json');
+    assert.equal(idx2.protocols.find((p) => p.slug === 'alpha').unlock.next.usd, 160000 * 101);
+    assert.equal(idx2.protocols.find((p) => p.slug === 'alpha').unlock.status, 'scheduled');
     assert.ok(cat.unavailable.some((u) => u.reason.includes('Unconfirmed')), 'tokens without a schedule are listed as unconfirmed');
   } finally {
     rmSync(out, { recursive: true, force: true });

@@ -4,8 +4,9 @@ import { chartCard } from '../cards.js';
 import { loadMany } from '../data.js';
 import { divergingChart } from '../charts.js';
 import { dataTable } from '../table.js';
-import { usd, usdPrice, pct, ratio } from '../format.js';
-import { priceMovesTakeaway, tokenValuationTakeaway, sizeTakeaway } from '../takeaways.js';
+import { usd, usdPrice, pct, ratio, compact, date } from '../format.js';
+import { priceMovesTakeaway, tokenValuationTakeaway, sizeTakeaway, unlockOverviewTakeaway } from '../takeaways.js';
+import { STATUS as UNLOCK_STATUS, whenText, circText, daysText, docDate } from '../unlocks.js';
 import { primaryOf, othersOf, measureLinks, measureDetail, KIND_TERM } from '../size.js';
 
 const isNum = (v) => typeof v === 'number' && Number.isFinite(v);
@@ -154,6 +155,37 @@ export async function render(root) {
     }),
     h('p', { class: 'chart-note' }, kinds.length ? `Measures in use: ${kinds.join(', ')}. ` : '', 'Tokenized assets come from DefiLlama’s yields list, because its dedicated real-world-asset dataset is on the paid plan; products with no listing there are named in “What is counted” and not included.'),
     sourceLine(Object.values(Object.fromEntries(sized.flatMap((r) => (r.P && r.sizeSources?.[r.P.src] ? [[`${r.P.src}|${r.P.src === 'dl-protocol' ? r.slug : ''}`, { ...r.sizeSources[r.P.src], label: r.P.src === 'dl-protocol' ? `${r.name}: TVL` : r.sizeSources[r.P.src].label }]] : [])))))));
+
+  // ---------- Upcoming unlocks ----------
+  const U = rows.map((r) => ({ ...r, u: r.unlock || null }));
+  if (U.some((r) => r.u)) {
+    const sym = (r) => r.symbol || r.tokenId;
+    root.append(h('section', { class: 'card', style: { marginTop: '18px' } },
+      h('div', { class: 'kicker' }, term('Upcoming unlocks', 'unlock')),
+      takeaway(unlockOverviewTakeaway(U.map((r) => ({ symbol: sym(r), status: r.u?.status || 'unconfirmed', pct12m: r.u?.next12m?.pctCirculating ?? null, unknown12m: r.u?.next12m?.unknown || 0, events12m: r.u?.next12m?.events || 0 }))), 'Scheduled token unlocks for the tokens you track'),
+      h('p', { class: 'chart-note' }, 'Dates and amounts are taken by hand from each project’s own documents, because every unlock API needs a paid key. “Unconfirmed” means no schedule could be confirmed from those documents; it does not mean nothing unlocks. Values use today’s price and will move with it. “Next 12 months” adds up only the tranches with a published amount.'),
+      dataTable({
+        caption: 'Upcoming token unlocks', csvName: 'token-unlocks', sortKey: 'pct12', pageSize: 50, search: false,
+        filters: [{ key: 'statusLabel', label: 'Status', plural: 'statuses' }],
+        rowClass: (r) => (r.group === 'watchlist' ? 'is-watch' : null),
+        columns: [
+          { key: 'symbol', label: 'Token', fmt: tokenCell },
+          { key: 'statusLabel', label: 'Schedule' },
+          { key: 'nextTs', label: 'Next unlock', fmt: (v, r) => (r.u?.next ? whenText(r.u.next.ts, r.u.next.precision) : '—'), csv: (r) => (r.u?.next ? (r.u.next.precision === 'month' ? new Date(r.u.next.ts * 1000).toISOString().slice(0, 7) : new Date(r.u.next.ts * 1000).toISOString().slice(0, 10)) : '') },
+          { key: 'nextTokens', label: 'Amount', num: true, fmt: (v, r) => (r.u?.next ? (v != null ? `${compact(v, 2)} ${sym(r)}` : h('span', { class: 'sub' }, 'not published')) : '—') },
+          { key: 'nextUsd', label: 'Value today', num: true, fmt: (v) => (v != null ? usd(v) : '—'), title: 'Calculated: tokens × the price snapshot' },
+          { key: 'nextPct', label: '% of circulating', num: true, fmt: (v) => circText(v), title: 'Calculated: tokens ÷ circulating supply' },
+          { key: 'nextDays', label: 'Days of volume', num: true, fmt: (v) => daysText(v), title: 'Calculated: value ÷ 24-hour trading volume' },
+          { key: 'pct12', label: 'Next 12 months', num: true, fmt: (v, r) => (v != null ? h('span', {}, `${circText(v)} of circulating`, r.u.next12m.unknown ? h('span', { class: 'sub' }, ` + ${r.u.next12m.unknown} of unpublished size`) : null) : r.u?.next12m?.events ? h('span', { class: 'sub' }, `${r.u.next12m.events} dated, size not published`) : '—'), title: 'Calculated: tokens due in the next 12 months with a published amount ÷ circulating supply' },
+          { key: 'usd12', label: '12-month value today', num: true, fmt: (v) => (v != null ? usd(v) : '—') },
+          { key: 'vestPct', label: 'Vesting continuously', wrap: true, fmt: (v, r) => ((r.u?.vesting || []).length ? h('span', { class: 'sub' }, r.u.vesting.map((s) => `${s.label}: about ${compact(s.tokensPerMonth, 2)} ${sym(r)} a month${s.pctCirculatingPerMonth != null ? ` (${circText(s.pctCirculatingPerMonth)} of circulating${s.usdPerMonth != null ? `, ${usd(s.usdPerMonth)}` : ''})` : ''} until ${docDate(s.end)}`).join('; ')) : '—'), csv: (r) => (r.u?.vesting || []).map((s) => `${s.label}: ${s.tokensPerMonth} a month until ${s.end}`).join('; '), title: 'Linear vesting: the total in the project’s documents spread evenly over the vesting window' },
+          { key: 'source', label: 'Checked against', wrap: true, fmt: (v, r) => (r.u?.source?.url ? h('span', { class: 'sub' }, extLink(r.u.source.url, r.u.source.label), r.u.lastChecked ? ` · checked ${date(Date.parse(`${r.u.lastChecked}T00:00:00Z`))}` : '') : h('span', { class: 'sub' }, 'no published source')), csv: (r) => r.u?.source?.url || '' },
+        ],
+        rows: U.map((r) => ({ ...r, vestPct: (r.u?.vesting || []).reduce((s, x) => s + (x.pctCirculatingPerMonth || 0), 0) || null, statusLabel: UNLOCK_STATUS[r.u?.status] || 'Unconfirmed', nextTs: r.u?.next?.ts ?? null, nextTokens: r.u?.next?.tokens ?? null, nextUsd: r.u?.next?.usd ?? null, nextPct: r.u?.next?.pctCirculating ?? null, nextDays: r.u?.next?.daysOfVolume ?? null, pct12: r.u?.next12m?.pctCirculating ?? null, usd12: r.u?.next12m?.usd ?? null })),
+      }),
+      h('p', { class: 'src' }, 'Each token page has the full schedule, the passage it was taken from and the vesting still running. Sizes are calculated from the price snapshot above.'),
+      sourceLine(priceSrc)));
+  }
 
   // ---------- Price moves ----------
   let period = PERIODS[0];

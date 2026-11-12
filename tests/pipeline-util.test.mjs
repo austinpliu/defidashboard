@@ -441,3 +441,61 @@ test('fee definitions are DefiLlama’s own words, largest sub-protocol first', 
   assert.equal(feeDefinitions(fees, { parentIds: new Set(['parent#nothing']) }), null);
   assert.equal(feeDefinitions({ ok: false }, { parentIds: new Set(['parent#aave']) }), null);
 });
+
+// ---------- unlock sizes ----------
+import { unlockSize, sizeTokenUnlocks, sizeText } from '../scripts/lib/unlock-size.mjs';
+
+test('unlock size: dollars today, share of circulating supply, days of volume', () => {
+  // ENA, Nov 2026: 93.75M tokens a month at $0.1414, 13.5B circulating, $300M daily volume
+  const z = unlockSize(93_750_000, { price: 0.1414, circulating: 13_500_000_000, volume24h: 300_000_000 });
+  assert.equal(z.usd, 13_256_250);
+  assert.equal(z.pctCirculating, 0.6944);
+  assert.equal(z.daysOfVolume, 0.04419);
+  assert.equal(sizeText(z), 'about $13.3M at today’s price · 0.69% of circulating supply · 0.044 days of trading volume');
+  // an unlock with no published amount has no size, and nothing is estimated
+  assert.deepEqual(unlockSize(null, { price: 1, circulating: 1, volume24h: 1 }), { usd: null, pctCirculating: null, daysOfVolume: null });
+  assert.equal(sizeText(unlockSize(null, {})), '');
+  // missing inputs leave only the parts that can be calculated
+  assert.deepEqual(unlockSize(1000, { price: 2 }), { usd: 2000, pctCirculating: null, daysOfVolume: null });
+  assert.deepEqual(unlockSize(1000, { circulating: 100_000 }), { usd: null, pctCirculating: 1, daysOfVolume: null });
+});
+
+test('sizeTokenUnlocks adds sizes and a 12-month summary without inventing amounts', () => {
+  const now = Date.parse('2026-11-12T00:00:00Z');
+  const month = (n) => Date.UTC(2026, 11 + n, 1) / 1000;
+  const u = {
+    status: 'scheduled',
+    events: [
+      { ts: month(0), precision: 'month', label: 'Core contributors', kind: 'monthly', tokens: 1000, share: 0.001, source: { url: 'https://docs.example/a' } },
+      { ts: month(0), precision: 'month', label: 'Investors', kind: 'monthly', tokens: null, share: null },
+      { ts: month(1), precision: 'month', label: 'Core contributors', kind: 'monthly', tokens: 1000, share: 0.001 },
+      { ts: month(2), precision: 'day', label: 'Founders: vesting ends', kind: 'vesting-end', tokens: null },
+    ],
+    schedules: [{ label: 'Core contributors', type: 'monthly', tokensPerPeriod: 1000 }, { label: 'Founders', type: 'linear', tokensPerMonth: 500 }, { label: 'No amount', type: 'linear', tokensPerMonth: null }],
+  };
+  const s = sizeTokenUnlocks(u, { price: 2, volume24h: 10_000 }, { circulating: 100_000 }, now);
+  assert.equal(s.events[0].usd, 2000);
+  assert.equal(s.events[0].pctCirculating, 1);
+  assert.equal(s.events[1].usd, null, 'no published amount: no size');
+  assert.equal(s.next.label, 'Core contributors');
+  assert.equal(s.next.usd, 2000);
+  assert.equal(s.next.sourceUrl, 'https://docs.example/a');
+  assert.equal(s.next12m.events, 3, 'a vesting end is a date, not an unlock');
+  assert.equal(s.next12m.unknown, 1);
+  assert.equal(s.next12m.tokens, 2000, 'only tranches with a published amount are added up');
+  assert.equal(s.next12m.pctCirculating, 2);
+  assert.equal(s.next12m.daysOfVolume, 0.4);
+  assert.equal(s.schedules[0].usdPerMonth, 2000);
+  assert.equal(s.schedules[1].usdPerMonth, 1000);
+  assert.equal(s.schedules[2].usdPerMonth, null);
+  assert.deepEqual(s.vesting, [], 'only vesting marked as still running is listed');
+  const run = sizeTokenUnlocks({ status: 'scheduled', events: [], schedules: [{ label: 'Founders', type: 'linear', ongoing: true, end: '2027-11-21', tokensPerMonth: 500, source: { url: 'https://docs.example/f' } }] }, { price: 2 }, { circulating: 100_000 }, now);
+  assert.deepEqual(run.vesting, [{ label: 'Founders', end: '2027-11-21', tokensPerMonth: 500, usdPerMonth: 1000, pctCirculatingPerMonth: 0.5, sourceUrl: 'https://docs.example/f' }]);
+  assert.equal(u.events[0].usd, undefined, 'the input is not changed');
+  // nothing dated ahead: a summary of zeros, no "next"
+  const none = sizeTokenUnlocks({ status: 'unconfirmed', events: [], schedules: [] }, { price: 2 }, { circulating: 1 }, now);
+  assert.equal(none.next, null);
+  assert.deepEqual(none.next12m, { events: 0, unknown: 0, tokens: null, usd: null, pctCirculating: null, daysOfVolume: null });
+  // no price: no sizes, and it says so
+  assert.equal(sizeTokenUnlocks(u, {}, {}, now).sizedAt, null);
+});

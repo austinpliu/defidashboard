@@ -118,6 +118,7 @@ export async function render(root, { query }) {
         h('div', { class: 'chips', style: { marginBottom: '4px' } }, h('span', { class: 'chip' }, h('span', { class: 'type-dot', style: { background: `var(--s${(T.slot % 8) + 1})` } }), T.term ? term(T.label, T.term) : T.label), (i.symbols || []).map((s) => h('span', { class: 'chip solid' }, s))),
         extLink(i.url, i.title, { class: 'title' }),
         i.manual ? h('span', { class: 'chip', style: { marginLeft: '6px' }, title: 'Taken by hand from the project’s own docs; open the link to check it' }, 'hand-checked') : null,
+        i.sizeText ? h('div', { class: 'summary', style: { fontSize: '13px', marginTop: '3px' } }, h('b', {}, 'Size: '), i.sizeText, h('span', { class: 'badge calc', 'data-term': 'calculated', tabindex: 0, style: { marginLeft: '6px' } }, 'Calculated'), S[i.sizeSrc] ? h('span', { class: 'sub' }, ' from the ', extLink(S[i.sizeSrc].api, 'price snapshot'), S[i.sizeSrc].fetchedAt ? ` of ${dateTime(S[i.sizeSrc].fetchedAt)}` : '') : null) : null,
         i.summary ? h('div', { class: 'summary', style: { fontSize: '13px', color: 'var(--ink-2)', marginTop: '3px' } }, i.summary) : null,
         h('p', { class: 'src', style: { marginTop: '6px' } }, 'Source: ', extLink(i.url, i.sourceName), src?.fetchedAt ? ` · fetched ${dateTime(src.fetchedAt)}` : '', i.type === 'launch-upgrade' ? ' · type from keyword match' : '')));
   }

@@ -2,7 +2,7 @@
 // Data: tokens/<id>.json › unlocks (built from the hand-checked unlocks.json).
 import { h, extLink, term } from './ui.js';
 import { dataTable } from './table.js';
-import { compact, date, monthYear } from './format.js';
+import { compact, date, monthYear, usd, pct } from './format.js';
 
 export const STATUS = {
   scheduled: 'Schedule published',
@@ -22,7 +22,7 @@ export const docDate = (s) => (/^\d{4}-\d{2}$/.test(s || '') ? monthYear(Date.pa
 export function unlockTakeaway(sym, u) {
   if (!u) return null;
   const next = (u.events || []).find((e) => e.tokens != null);
-  if (next) return { pre: 'Next confirmed unlock: ', hl: `${compact(next.tokens, 2)} ${sym} ${next.precision === 'month' ? `during ${monthYear(next.ts * 1000)}` : `on ${date(next.ts * 1000)}`}`, post: next.share != null ? ` (${shareText(next.share)} of supply)` : '' };
+  if (next) return { pre: 'Next confirmed unlock: ', hl: `${compact(next.tokens, 2)} ${sym} ${next.precision === 'month' ? `during ${monthYear(next.ts * 1000)}` : `on ${date(next.ts * 1000)}`}`, post: next.usd != null && next.pctCirculating != null ? `, about ${usd(next.usd)} at today’s price (${circText(next.pctCirculating)} of circulating supply)` : next.share != null ? ` (${shareText(next.share)} of supply)` : '' };
   const lin = (u.schedules || []).find((s) => s.type === 'linear' && s.ongoing && s.tokensPerMonth != null);
   if (lin) return { pre: `${lin.label}: `, hl: `about ${compact(lin.tokensPerMonth, 2)} ${sym} a month`, post: ` vests until ${docDate(lin.end)}` };
   const dated = (u.events || []).find((e) => e.kind === 'release');
@@ -31,6 +31,10 @@ export function unlockTakeaway(sym, u) {
   if (u.status === 'partial') return { pre: `${sym}'s docs give `, hl: 'vesting windows, not dated tranches', post: '' };
   return { pre: `${sym}'s unlock schedule is `, hl: 'unconfirmed', post: ': the project publishes none we could check' };
 }
+
+/** "0.61%" for a share of circulating supply (two significant digits under 10%). */
+export const circText = (v) => (v == null ? '—' : `${Number(v.toPrecision(v >= 10 ? 3 : 2))}%`);
+export const daysText = (v) => (v == null ? '—' : v >= 10 ? `${Math.round(v)} days` : `${Number(v.toPrecision(2))} day${v === 1 ? '' : 's'}`);
 
 export function unlocksBlock(u, sym, { maxEvents = 8 } = {}) {
   if (!u) return h('div', { class: 'notice' }, h('b', {}, 'Unconfirmed. '), 'No unlock schedule has been checked for this token yet.');
@@ -45,6 +49,9 @@ export function unlocksBlock(u, sym, { maxEvents = 8 } = {}) {
         { key: 'label', label: 'What', wrap: true },
         { key: 'tokens', label: 'Amount', num: true, fmt: (v, r) => (v != null ? `${compact(v, 2)} ${sym}` : r.kind === 'vesting-end' ? '—' : 'not published'), termKey: 'unlock' },
         { key: 'share', label: 'Share of supply', num: true, fmt: (v) => shareText(v) },
+        { key: 'usd', label: 'Value today', num: true, fmt: (v) => (v != null ? usd(v) : '—'), title: 'Calculated: tokens × the price snapshot' },
+        { key: 'pctCirculating', label: '% of circulating', num: true, fmt: (v) => circText(v), title: 'Calculated: tokens ÷ circulating supply' },
+        { key: 'daysOfVolume', label: 'Days of volume', num: true, fmt: (v) => daysText(v), title: 'Calculated: value ÷ 24-hour trading volume on all exchanges' },
         { key: 'source', label: 'Source', fmt: (v) => (v?.url ? extLink(v.url, v.label) : '—'), csv: (r) => r.source?.url || '' },
       ],
       rows: events,
@@ -66,6 +73,7 @@ export function unlocksBlock(u, sym, { maxEvents = 8 } = {}) {
     term('Unlocks', 'unlock'), ' manually sourced from ',
     srcs.length ? srcs.flatMap((s, i) => [i ? ' and ' : '', extLink(s.url, s.label)]) : 'no published source',
     u.lastChecked ? `; last checked ${date(Date.parse(`${u.lastChecked}T00:00:00Z`))}.` : '.',
-    u.supplyUsed ? ` Token amounts are the docs’ share × CoinGecko’s ${u.supplyUsed.basis} (${compact(u.supplyUsed.value, 2)} ${sym}).` : ''));
+    u.supplyUsed ? ` Token amounts are the docs’ share × CoinGecko’s ${u.supplyUsed.basis} (${compact(u.supplyUsed.value, 2)} ${sym}).` : '',
+    u.sizedAt ? ` Sizes are calculated at today’s price (${usd(u.sizedAt.price)}), against ${compact(u.sizedAt.circulating, 2)} ${sym} circulating and ${usd(u.sizedAt.volume24h)} of 24-hour volume; they will change as the price does.` : ''));
   return h('div', { class: 'unlocks' }, parts);
 }

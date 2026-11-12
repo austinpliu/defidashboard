@@ -270,3 +270,21 @@ test('holdersTakeaway separates "none", "no data" and "no revenue"', () => {
   assert.equal(text(holdersTakeaway('Ondo Finance', 'ONDO', { total30d: 0 }, { total30d: 0 })), 'Ondo Finance records no protocol revenue, so nothing reaches ONDO holders');
   assert.equal(holdersTakeaway('X', 'X', { unavailable: 'x' }, {}), null);
 });
+
+// ---- Unlock overview headline ----
+import { unlockOverviewTakeaway } from '../site/assets/js/takeaways.js';
+
+test('unlockOverviewTakeaway counts what is known and never reads "unconfirmed" as "nothing"', () => {
+  const rows = [
+    { symbol: 'ENA', status: 'scheduled', pct12m: 4.2, unknown12m: 6, events12m: 12 },
+    { symbol: 'MORPHO', status: 'scheduled', pct12m: null, unknown12m: 0, events12m: 0 },
+    { symbol: 'ONDO', status: 'partial', pct12m: null, unknown12m: 1, events12m: 1 },
+    { symbol: 'PENDLE', status: 'none', pct12m: null, unknown12m: 0, events12m: 0 },
+    { symbol: 'AAVE', status: 'unconfirmed', pct12m: null, unknown12m: 0, events12m: 0 },
+    { symbol: 'HYPE', status: 'unconfirmed', pct12m: null, unknown12m: 0, events12m: 0 },
+  ];
+  assert.equal(text(unlockOverviewTakeaway(rows)), 'ENA has the most supply due to unlock in the next 12 months with a published amount: 4.2% of its circulating supply (plus tranches of unpublished size). 1 more has dated unlocks of unpublished size; 1 has nothing left to unlock; 2 of 6 publish no schedule that could be confirmed');
+  assert.equal(text(unlockOverviewTakeaway(rows.slice(4))), 'None of the tracked tokens publishes an unlock schedule that could be confirmed');
+  assert.match(text(unlockOverviewTakeaway(rows.slice(2))), /^No tracked token has a dated unlock of published size in the next 12 months\. 1 more has dated unlocks of unpublished size/);
+  assert.equal(unlockOverviewTakeaway([]), null);
+});

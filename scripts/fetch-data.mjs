@@ -24,6 +24,7 @@ import { sourceRecord, derivedRecord, carryForward } from './lib/sources.mjs';
 import { fetchWeeklyPrices, fundamentalsInputs } from './lib/fundamentals.mjs';
 import { valuationRatios, valuationSources } from './lib/valuation.mjs';
 import { tokenizedAssets, openInterestFor, sizeMeasures, feeDefinitions } from './lib/size.mjs';
+import { unlockSize, sizeTokenUnlocks, sizeText, unlockSizeSource } from './lib/unlock-size.mjs';
 import { roundSmart, num, slugify, normSeries, dailySeries, trimDays, compactSeries } from './lib/util.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -519,7 +520,9 @@ async function main() {
     const unconfirmed = [];
     for (const p of protocols) {
       if (!p.token) continue;
-      const u = buildTokenUnlocks(manual.tokens[p.token.id], { supply: p.token.supply });
+      // each dated unlock also gets a size: dollars at the snapshot price, share of circulating supply, days of volume
+      const u = sizeTokenUnlocks(buildTokenUnlocks(manual.tokens[p.token.id], { supply: p.token.supply }), p.token.market || {}, p.token.supply || {});
+      const sizeCtx = { price: p.token.market?.price, circulating: p.token.supply?.circulating, volume24h: p.token.market?.volume24h };
       const sym = p.entry.symbol || p.token.symbol || p.entry.name;
       const srcKey = `manual-unlocks-${p.token.id}`;
       const first = u.sources[0];
@@ -529,6 +532,13 @@ async function main() {
       p.token.unlocks = { ...u, src: srcRec ? srcKey : null };
       p.doc.unlocks = { ...u, src: srcRec ? srcKey : null };
       if (srcRec) { p.token.sources[srcKey] = srcRec; p.doc.sources[srcKey] = srcRec; catSources[srcKey] = srcRec; }
+      if (srcRec && u.sizedAt) {
+        const calc = unlockSizeSource(srcKey, p.token.market?.src || 'cg-coin');
+        p.token.sources['calc-unlock-size'] = calc;
+        p.doc.sources['calc-unlock-size'] = calc;
+        p.token.unlocks.sizeSrc = 'calc-unlock-size';
+        p.doc.unlocks.sizeSrc = 'calc-unlock-size';
+      }
       if (u.status === 'unconfirmed') unconfirmed.push(sym);
       // Catalysts: dated events. Tranches that fall in the same month (or on the same day) for
       // one token become one item, and monthly schedules show their next 6 months.
@@ -569,6 +579,10 @@ async function main() {
           share: known.length && known.every((e) => e.share != null) ? known.reduce((sum, e) => sum + e.share, 0) : null,
           partialAmount: known.length > 0 && known.length < evs.length,
           manual: true,
+          // how big it is (calculated; null when the docs publish no amount)
+          size: known.length ? unlockSize(total, sizeCtx) : null,
+          sizeText: known.length ? sizeText(unlockSize(total, sizeCtx)) : '',
+          sizeSrc: known.length && p.token.market?.src ? p.token.market.src : null,
         });
       }
     }
@@ -692,6 +706,9 @@ async function main() {
     };
   });
   if (gov.source) catSources.snapshot = gov.source;
+  // unlock sizes are calculated from the price snapshot, so Catalysts cites it too
+  if (snapshot.ok && unlockItems.some((i) => i.sizeSrc === 'cg-snapshot')) catSources['cg-snapshot'] = snapshot.source;
+  for (const i of unlockItems) if (i.sizeSrc && !catSources[i.sizeSrc]) i.sizeSrc = null;
   const scheduled = protocols.flatMap((p) =>
     (p.doc.hallmarks?.list || [])
       .filter((h) => h.ts * 1000 > now)
@@ -797,6 +814,8 @@ async function main() {
       holdersRevenueNote: doc.holdersRevenue?.unavailable || null,
       // calculated ratios (formulas in each protocol file's sources): value ÷ (30-day total × 365 ÷ 30)
       valuation: Object.fromEntries(Object.entries(doc.derived || {}).map(([k, v]) => [k, v.value])),
+      // upcoming unlocks, hand-checked from the project's docs, with calculated sizes
+      unlock: token?.unlocks ? { status: token.unlocks.status, summary: token.unlocks.summary || null, lastChecked: token.unlocks.lastChecked || null, next: token.unlocks.next || null, next12m: token.unlocks.next12m || null, vesting: token.unlocks.vesting || [], source: token.unlocks.sources?.[0] || null, sized: Boolean(token.unlocks.sizedAt) } : null,
       // size in the measure that fits this kind of protocol (TVL, tokenized assets or open interest)
       size: doc.size || null,
       feesAre: doc.definitions?.list?.[0] ? { from: doc.definitions.list[0].name, shareOfFees: doc.definitions.list[0].shareOfFees, fees: doc.definitions.list[0].methodology.Fees || null, revenue: doc.definitions.list[0].methodology.Revenue || null, holders: doc.definitions.list[0].methodology.HoldersRevenue || null } : null,

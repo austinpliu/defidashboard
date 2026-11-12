@@ -343,3 +343,31 @@ export function holdersTakeaway(name, symbol, revenue, holders) {
   if (share >= 99.5) return { pre: '', hl: `All of ${name}’s revenue`, post: ` reaches ${who}, as DefiLlama counts it` };
   return { pre: '', hl: `${pct(share, { signed: false, digits: 0 })} of ${name}’s revenue`, post: ` reaches ${who}, as DefiLlama counts it` };
 }
+
+// ---------- Unlocks across tracked tokens ----------
+
+/**
+ * rows: [{ symbol, status, pct12m, unknown12m, events12m }] where pct12m is the share of
+ * circulating supply due to unlock in the next 12 months (null when no amount is published).
+ * Counts what is known and what isn't; it never treats "unconfirmed" as "nothing to unlock".
+ */
+export function unlockOverviewTakeaway(rows) {
+  const all = rows || [];
+  if (!all.length) return null;
+  const sized = all.filter((r) => isNum(r.pct12m) && r.pct12m > 0).sort((a, b) => b.pct12m - a.pct12m);
+  const unconfirmed = all.filter((r) => r.status === 'unconfirmed').length;
+  const none = all.filter((r) => r.status === 'none').length;
+  const unsized = all.filter((r) => r.events12m > 0 && !isNum(r.pct12m)).length;
+  const tail = [
+    unsized ? `${unsized} more ${unsized === 1 ? 'has' : 'have'} dated unlocks of unpublished size` : null,
+    none ? `${none} ${none === 1 ? 'has' : 'have'} nothing left to unlock` : null,
+    unconfirmed ? `${unconfirmed} of ${all.length} publish no schedule that could be confirmed` : null,
+  ].filter(Boolean).join('; ');
+  const fmt = (v) => `${Number(v.toPrecision(v >= 10 ? 3 : 2))}%`;
+  if (sized.length) {
+    const a = sized[0];
+    return { pre: `${a.symbol} has the most supply due to unlock in the next 12 months with a published amount: `, hl: `${fmt(a.pct12m)} of its circulating supply`, post: `${a.unknown12m ? ' (plus tranches of unpublished size)' : ''}${tail ? `. ${tail[0].toUpperCase()}${tail.slice(1)}` : ''}` };
+  }
+  if (unconfirmed === all.length) return { pre: 'None of the tracked tokens ', hl: 'publishes an unlock schedule', post: ' that could be confirmed' };
+  return tail ? { pre: '', hl: 'No tracked token has a dated unlock of published size', post: ` in the next 12 months. ${tail[0].toUpperCase()}${tail.slice(1)}` } : null;
+}
