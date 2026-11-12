@@ -499,3 +499,20 @@ test('sizeTokenUnlocks adds sizes and a 12-month summary without inventing amoun
   // no price: no sizes, and it says so
   assert.equal(sizeTokenUnlocks(u, {}, {}, now).sizedAt, null);
 });
+
+// ---------- what the fee total is made of ----------
+import { feeComposition } from '../scripts/lib/defillama.mjs';
+
+test('feeComposition separates stablecoin issuers and chains from fees paid to applications', () => {
+  const c = feeComposition([
+    { name: 'Tether', category: 'Stablecoin Issuer', total30d: 514e6 }, { name: 'Circle USDC', category: 'Stablecoin Issuer', total30d: 205e6 },
+    { name: 'Ethereum', category: 'Chain', total30d: 81e6 }, { name: 'Hyperliquid Perps', category: 'Derivatives', total30d: 86e6 },
+    { name: 'Aave V3', category: 'Lending', total30d: 114e6 }, { name: 'Broken', category: 'Dexs', total30d: null }, { name: 'Refund', category: 'Dexs', total30d: -5 },
+  ]);
+  assert.equal(c.listedTotal30d, 1e9);
+  assert.deepEqual(c.parts.map((p) => [p.key, p.total30d, p.share]), [['Stablecoin Issuer', 719e6, 71.9], ['Chain', 81e6, 8.1]]);
+  assert.equal(c.apps.total30d, 200e6);
+  assert.equal(c.apps.share, 20);
+  assert.deepEqual(feeComposition([{ name: 'A', category: 'Dexs', total30d: 10 }]).parts, [], 'nothing to flag when neither category is present');
+  assert.equal(feeComposition([]), null);
+});

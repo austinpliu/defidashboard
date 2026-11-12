@@ -25,7 +25,7 @@ import { fetchWeeklyPrices, fundamentalsInputs } from './lib/fundamentals.mjs';
 import { valuationRatios, valuationSources } from './lib/valuation.mjs';
 import { tokenizedAssets, openInterestFor, sizeMeasures, feeDefinitions } from './lib/size.mjs';
 import { unlockSize, sizeTokenUnlocks, sizeText, unlockSizeSource } from './lib/unlock-size.mjs';
-import { roundSmart, num, slugify, normSeries, dailySeries, trimDays, compactSeries } from './lib/util.mjs';
+import { roundSmart, num, slugify, normSeries, dailySeries, trimDays, compactSeries, firstSentences } from './lib/util.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const OUT = process.env.DATA_OUT_DIR || join(ROOT, 'site', 'data');
@@ -232,6 +232,12 @@ async function main() {
       }
     } else if (!core.tvl?.series?.length && core.tvl) {
       core.tvl.unavailable = core.tvl.unavailable || `DefiLlama reports no TVL history for ${entry.name}.`;
+    }
+    // DefiLlama sometimes gives a parent the description of one of its products (Ondo Finance
+    // carries the text for its Treasury-fund token). Say so, instead of passing it off as the whole.
+    if (core.about?.description && kidsAll.length > 1) {
+      const same = kidsAll.filter((k) => k.description && firstSentences(k.description, 2) === core.about.description);
+      if (same.length === 1) core.about.descriptionOf = { name: same[0].name, slug: same[0].slug, of: kidsAll.length };
     }
     // Parent protocols carry no category/chains of their own; use their children's.
     if (core.about && protocolList) {
@@ -611,10 +617,13 @@ async function main() {
     });
     Object.assign(doc.sources, valuationSources(t?.market?.src || 'cg-coin'));
 
-    doc.news = feedItemsAll
+    const allNews = feedItemsAll
       .filter((i) => i.protocols.includes(doc.slug))
-      .sort((a, b) => Date.parse(b.date) - Date.parse(a.date))
-      .slice(0, 12);
+      .sort((a, b) => Date.parse(b.date) - Date.parse(a.date));
+    doc.news = allNews.slice(0, 12);
+    // the page lists the latest 12; its headline counts them all
+    doc.newsTotal = allNews.length;
+    doc.newsSince = allNews.length ? allNews[allNews.length - 1].date : null;
     for (const i of doc.news) doc.sources[i.src] = catSources[i.src];
   }
 
@@ -731,14 +740,18 @@ async function main() {
   const watchSet = new Set(watchMeta.map((w) => w.slug));
   const catalystItems = [...govItems, ...unlockItems, ...scheduled, ...feedItemsAll.filter((i) => i.protocols.some((s) => watchSet.has(s)))]
     .sort((a, b) => Date.parse(a.date) - Date.parse(b.date));
-  const headlines = feedItemsAll
+  const allHeadlines = feedItemsAll
     .filter((i) => i.baseType === 'news' && (i.defi || i.protocols.length))
-    .sort((a, b) => Date.parse(b.date) - Date.parse(a.date))
-    .slice(0, 30);
+    .sort((a, b) => Date.parse(b.date) - Date.parse(a.date));
+  const headlines = allHeadlines.slice(0, 30);
   const catalysts = {
     generatedAt: new Date().toISOString(),
     items: catalystItems,
     headlines,
+    // the list is capped at 30; these count every matching headline so the site can say how many there were
+    headlinesTotal: allHeadlines.length,
+    headlinesSince: allHeadlines.length ? allHeadlines[allHeadlines.length - 1].date : null,
+    headlinesOutlets: new Set(allHeadlines.map((i) => i.sourceName)).size,
     unavailable: unlockNoteParts.filter(Boolean).map((reason) => ({ type: 'unlock', title: 'Token unlocks: unconfirmed for some tokens', reason })),
     protocols: watchMeta.map(({ slug, name, symbol, group }) => ({ slug, name, symbol, group })),
     sources: catSources,

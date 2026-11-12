@@ -190,7 +190,10 @@ function peChart(p, S) {
   const pts = (p.mcapDaily || []).map(([t, m]) => { const a = ann.get(Math.floor(t / DAY)); return a > 0 && m > 0 ? [t, m / a] : null; }).filter(Boolean);
   const src = [S[p.market?.src] || S[p.seriesSrc], S[p.revenue?.src]].filter(Boolean);
   if (pts.length < 2) return chartCard({ kicker: 'Check 2 · Revenue vs size', fallback: 'Market cap ÷ annualized revenue over time', unavailableReason: !p.mcapDaily?.length ? 'No market-cap history for the token.' : 'No days with both a market cap and positive 30-day revenue.', src, sources: S });
-  const last = pts[pts.length - 1][1];
+  // "now" is the same figure the protocol and Tokens pages show (market cap from the price
+  // snapshot ÷ annualized 30-day revenue); the line's last point is the latest daily close
+  const snapNow = p.market?.marketCap > 0 && p.revenue?.total30d > 0 ? p.market.marketCap / ((p.revenue.total30d * 365) / 30) : null;
+  const last = snapNow ?? pts[pts.length - 1][1];
   const first = pts[0][1];
   return chartCard({
     kicker: 'Check 2 · Revenue vs size',
@@ -239,7 +242,7 @@ function priceRevenueChart(p, S, check) {
   return chartCard({
     kicker: 'Check 7 · Narrative vs fundamentals',
     termKey: 'narrative',
-    take: check.status !== 'nodata' ? { pre: '', hl: check.why.replace(/:.*$/, '').replace(/\.$/, ''), post: check.status === 'mixed' || gap?.value == null ? '' : ` (${fmtNumber(gap)})` } : null,
+    take: check.status !== 'nodata' ? { pre: '', hl: check.why.replace(/:.*$/, '').replace(/\.$/, ''), post: '' } : null,
     fallback: `${p.name}: price and rolling 30-day revenue, indexed`,
     title: 'Price vs rolling 30-day revenue, both indexed to 100',
     note: 'Both lines start at 100 so their growth can be compared on one axis.',

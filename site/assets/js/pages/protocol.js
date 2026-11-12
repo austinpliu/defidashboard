@@ -57,6 +57,7 @@ export async function render(root, { params }) {
         (a.chains || []).slice(0, 8).map((c) => h('span', { class: 'chip' }, c)),
         (a.chains || []).length > 8 ? h('span', { class: 'chip' }, `+${a.chains.length - 8} more`) : null))),
     a.description ? h('p', { class: 'p-desc' }, a.description) : unavailable('No description', a.unavailable || 'DefiLlama has no description for this protocol.'),
+    a.descriptionOf ? h('p', { class: 'chart-note' }, `DefiLlama gives ${name} the same description as ${a.descriptionOf.name}, one of its ${a.descriptionOf.of} sub-protocols, so the text above describes that product rather than all of ${name}.`) : null,
     d.token?.description && d.token.description !== a.description
       ? h('p', { class: 'p-desc', style: { fontSize: '14px', color: 'var(--ink-2)', marginTop: '8px' } }, h('b', {}, 'CoinGecko: '), d.token.description)
       : null,
@@ -213,7 +214,8 @@ export async function render(root, { params }) {
 
   // ---------- Valuation + supply ----------
   const idx = files['index.json'].data;
-  const others = (idx?.protocols || []).filter((p) => p.slug !== slug && p.mcap && p.fees30d).map((p) => ({ name: p.name, value: p.mcap / ((p.fees30d * 365) / 30) }));
+  // every other tracked protocol's market cap ÷ annualized revenue (null where it has none)
+  const others = (idx?.protocols || []).filter((p) => p.slug !== slug).map((p) => ({ name: p.name, value: p.valuation?.mcapToRevenue ?? null }));
   const sup = tk.supply || {};
   const HR = d.holdersRevenue || {};
   const pctOrDash = (x) => (x?.value != null ? pct(x.value, { signed: false }) : '—');
@@ -253,7 +255,7 @@ export async function render(root, { params }) {
   const unl = d.unlocks || {};
   grid.append(h('div', { class: 'span-6' }, infoCard({
     kicker: 'Valuation & supply',
-    take: valuationTakeaway(sym || name, D.mcapToFees?.value, others) || supplyTakeaway(sym || name, sup),
+    take: valuationTakeaway(sym || name, { mcapToRevenue: D.mcapToRevenue?.value, mcapToFees: D.mcapToFees?.value, revenue30d: R.total30d }, others) || supplyTakeaway(sym || name, sup),
     fallback: `${sym || name} valuation and supply`,
     body: [
       valTable,
@@ -387,7 +389,12 @@ export async function render(root, { params }) {
   const news = d.news || [];
   grid.append(h('div', { class: 'span-6' }, infoCard({
     kicker: 'News & posts',
-    take: news.length ? { pre: '', hl: `${news.length} mention${news.length === 1 ? '' : 's'}`, post: ` of ${name} in recent news and posts` } : null,
+    // d.newsTotal counts every mention; the list below shows the latest 12
+    take: news.length ? (() => {
+      const total = d.newsTotal ?? news.length;
+      const days = d.newsSince ? Math.max(1, Math.ceil((Date.now() - Date.parse(d.newsSince)) / 864e5)) : null;
+      return { pre: '', hl: `${total} mention${total === 1 ? '' : 's'}`, post: ` of ${name} in news and posts${days ? ` over the last ${days} day${days === 1 ? '' : 's'}` : ''}${total > news.length ? `; the latest ${news.length} are listed` : ''}` };
+    })() : null,
     fallback: `${name} in the news`,
     body: news.length
       ? h('ul', { class: 'feed' }, news.map((i) => h('li', {}, h('div', { class: 'when' }, shortDate(i.date), h('br'), relative(i.date)), h('div', { class: 'what' }, extLink(i.url, i.title), h('div', { class: 'meta' }, h('span', {}, i.sourceName), h('span', { class: 'chip' }, i.type.replace('-', ' ')))))))

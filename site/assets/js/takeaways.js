@@ -79,15 +79,44 @@ export function chainTakeaway(chains) {
   return { pre: `${top.name} holds `, hl: `${pct(top.share, { signed: false, digits: 0 })} of all DeFi TVL`, post: '' };
 }
 
-/** Leader in a ranked list of protocols by a money metric. scope names the comparison set. */
+/**
+ * Leader in a ranked list of protocols by a money metric. scope names the comparison set.
+ * "2.5x the fees of the next-largest" (not "2.5x more", which reads as 3.5x), and "took in"
+ * rather than "earned": fees are what users pay, not what a protocol keeps.
+ */
 export function leaderTakeaway(list, { metric = 'fees', field = 'total30d', period = 'the last 30 days', scope = 'protocol' } = {}) {
   if (!list?.length || !isNum(list[0][field])) return null;
   const [a, b] = list;
+  const verb = metric === 'revenue' ? 'kept' : 'took in';
   if (b && isNum(b[field]) && b[field] > 0) {
     const x = a[field] / b[field];
-    if (x >= 1.8) return { pre: `${a.name} earned `, hl: `${ratio(x).replace('×', 'x')} more ${metric}`, post: ` than any other ${scope} over ${period}` };
+    if (x >= 1.8) return { pre: `${a.name} ${verb} `, hl: `${Number(x.toFixed(1))}x the ${metric} of the next-largest ${scope}`, post: ` (${b.name}) over ${period}: ${usd(a[field])}` };
   }
   return { pre: `${a.name} `, hl: `led ${scope === 'protocol' ? 'all protocols' : `every ${scope}`} in ${metric}`, post: ` over ${period}, with ${usd(a[field])}` };
+}
+
+/**
+ * What DefiLlama's fee total is made of. composition: { total30d, parts: [{ key, label, total30d, share }] }
+ * where parts are the categories that are not fees paid by DeFi users (stablecoin issuers'
+ * reserve income, blockchains' own transaction fees).
+ */
+export function feesTotalTakeaway(fees) {
+  if (!fees || !isNum(fees.total30d)) return null;
+  const base = { pre: 'Protocols and chains tracked by DefiLlama took in ', hl: `${usd(fees.total30d)} of fees`, post: ' over the last 30 days' };
+  const big = (fees.composition?.parts || []).filter((p) => isNum(p.share) && p.share >= 10).sort((x, y) => y.share - x.share)[0];
+  if (!big) return base;
+  return { ...base, post: `${base.post}; about ${pct(big.share, { signed: false, digits: 0 })} of it is ${big.label}` };
+}
+
+/** "N DeFi headlines in the last D days from K outlets", counting every match, not the ones shown. */
+export function headlinesTakeaway({ total, shown, sinceTs, outlets, now = Date.now() }) {
+  if (!isNum(total) || total <= 0) return null;
+  const days = isNum(sinceTs) ? Math.max(1, Math.ceil((now - sinceTs) / 864e5)) : null;
+  return {
+    pre: '',
+    hl: `${total} DeFi headline${total === 1 ? '' : 's'}`,
+    post: `${days ? ` in the last ${days} day${days === 1 ? '' : 's'}` : ''}${isNum(outlets) && outlets > 0 ? ` from ${outlets} outlet${outlets === 1 ? '' : 's'}` : ''}${isNum(shown) && shown < total ? `; the latest ${shown} are listed` : ''}`,
+  };
 }
 
 /** Stablecoins: record supply, or how concentrated issuance is. */
@@ -165,17 +194,26 @@ export function protocolChainTakeaway(name, chainTvl) {
 }
 
 /**
- * Token valuation vs fees, ranked against other tracked protocols.
- * `others` = [{ name, value }] for every OTHER protocol (not this one).
+ * Token valuation against revenue, ranked against the other tracked protocols.
+ * v: { mcapToRevenue, mcapToFees, revenue30d }; others: [{ name, value }] = every OTHER
+ * protocol's market cap ÷ annualized revenue. A protocol that keeps no revenue has no revenue
+ * multiple; its fee multiple is given with the warning that those fees pass through it.
  */
-export function valuationTakeaway(symbol, mcapToFees, others = []) {
-  if (!isNum(mcapToFees) || mcapToFees <= 0) return null;
-  const valid = others.filter((p) => isNum(p.value) && p.value > 0);
-  const cheaper = valid.filter((p) => p.value < mcapToFees).length;
-  const base = { pre: `${symbol} trades at `, hl: `${ratio(mcapToFees)} annualized fees`, post: '' };
-  if (valid.length >= 2 && cheaper === 0) return { ...base, post: `, the lowest multiple of the ${valid.length + 1} protocols tracked here` };
-  if (valid.length >= 2 && cheaper === valid.length) return { ...base, post: `, the highest multiple of the ${valid.length + 1} protocols tracked here` };
-  return base;
+export function valuationTakeaway(symbol, v = {}, others = []) {
+  const m = v.mcapToRevenue;
+  if (isNum(m) && m > 0) {
+    const valid = others.filter((p) => isNum(p.value) && p.value > 0);
+    const lower = valid.filter((p) => p.value < m).length;
+    const base = { pre: `${symbol}’s market cap is `, hl: `${ratio(m)} annualized revenue`, post: '' };
+    if (valid.length >= 2 && lower === 0) return { ...base, post: `, the lowest multiple of the ${valid.length + 1} tracked protocols with revenue` };
+    if (valid.length >= 2 && lower === valid.length) return { ...base, post: `, the highest multiple of the ${valid.length + 1} tracked protocols with revenue` };
+    return base;
+  }
+  if (v.revenue30d === 0 && isNum(v.mcapToFees) && v.mcapToFees > 0) {
+    return { pre: `${symbol} has `, hl: 'no revenue multiple', post: `: the protocol keeps none of its fees. Its market cap is ${ratio(v.mcapToFees)} annualized fees, but those fees pass through to others` };
+  }
+  if (isNum(v.mcapToFees) && v.mcapToFees > 0) return { pre: `${symbol}’s market cap is `, hl: `${ratio(v.mcapToFees)} annualized fees`, post: ' (no revenue figure to compare it with)' };
+  return null;
 }
 
 export function priceTakeaway(symbol, market, series) {

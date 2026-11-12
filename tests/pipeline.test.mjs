@@ -31,6 +31,10 @@ test('pipeline writes every file with sources and handles failures honestly', ()
       assert.ok(market.sources[h.src]?.fetchedAt, `${k} has fetchedAt`);
     }
     assert.equal(market.topFees.list[0].name, 'Beta');
+    // the fee total says how much of it is chains' own fees (the stub's "Ethereum" entry) rather than app fees
+    assert.equal(market.headline.fees.composition.parts[0].key, 'Chain');
+    assert.ok(market.headline.fees.composition.parts[0].share > 90);
+    assert.equal(market.headline.fees.composition.apps.total30d, 3e7 + 3e6 + 6e7);
     assert.ok(market.topFees.list.every((p) => p.name !== 'Ethereum'), 'chains are not ranked as protocols');
 
     const alpha = read('protocols/alpha.json');
@@ -130,6 +134,11 @@ test('pipeline writes every file with sources and handles failures honestly', ()
     assert.ok(pred.sources['pm-events'].ok);
 
     const cat = read('catalysts.json');
+    // headline counts are counts, not the display cap
+    assert.equal(cat.headlinesTotal, cat.headlines.length, 'fewer than 30 headlines: the total equals the list');
+    assert.equal(cat.headlinesOutlets, new Set(cat.headlines.map((h) => h.sourceName)).size);
+    assert.equal(alpha.newsTotal, alpha.news.length);
+    assert.ok(alpha.newsSince);
     assert.ok(cat.items.some((i) => i.type === 'governance-vote' && i.status === 'open'));
     assert.ok(cat.items.every((i) => i.url && i.src && cat.sources[i.src]), 'every catalyst has a link and a source');
     assert.equal(cat.items.filter((i) => i.type === 'unlock').length, 6, 'Catalysts shows the next 6 months of tranches, one item per month');
