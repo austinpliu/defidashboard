@@ -1,6 +1,10 @@
 {
- "checkedAt": "2026-11-13T07:11:25.693Z",
+ "checkedAt": "2026-11-13T20:07:07.546Z",
  "links": [
+  {
+   "url": "https://defillama.com/yields/pool/42eaf290-24c3-4ce0-82ab-c1276444871b",
+   "status": 200
+  },
   {
    "url": "https://defillama.com/yields/pool/bd335b46-3daf-4507-adb2-6fd4337ea33b",
    "status": 404
