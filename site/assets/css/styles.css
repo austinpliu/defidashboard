@@ -563,3 +563,26 @@ footer.site a { color: var(--ink-2); }
 /* links that failed the last automatic link check */
 a.link-broken { text-decoration-style: wavy; text-decoration-color: var(--bad-ink); }
 .link-flag { color: var(--bad-ink); font-size: 0.85em; white-space: nowrap; }
+
+/* ---------- Overview: headline strip in two labelled pairs, then labelled groups of related boxes ---------- */
+.stat-groups { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 22px; }
+.stat-group { min-width: 0; display: flex; flex-direction: column; } /* both pairs stretch to the taller one */
+.stat-group > .stats { flex: 1; }
+.stat-group-label { display: flex; align-items: center; gap: 10px; margin: 0 0 8px; font: 700 11.5px/1 var(--font); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.stat-group-label::after { content: ''; flex: 1; height: 1px; background: var(--border-strong); }
+.stat-groups .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (max-width: 900px) { .stat-groups { grid-template-columns: minmax(0, 1fr); } }
+
+.ov-group { margin-top: 44px; }
+.ov-group:first-child { margin-top: 30px; }
+.ov-head { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: end; gap: 6px 16px; padding-top: 16px; margin-bottom: 18px; border-top: 3px solid var(--ink); }
+.ov-n { align-self: start; display: grid; place-items: center; min-width: 46px; height: 46px; padding: 0 8px; border-radius: 10px; background: var(--marker); color: #0e0e0c; font: 900 26px/1 var(--font-head); letter-spacing: -0.02em; }
+.ov-titles { min-width: 0; }
+.ov-titles h2 { margin: 6px 0 0; font: 800 clamp(22px, 2.4vw, 30px)/1.1 var(--font-head); letter-spacing: -0.02em; }
+.ov-sub { margin: 6px 0 0; max-width: 70ch; font-size: 14px; color: var(--ink-2); }
+.ov-head > .tool { justify-self: end; white-space: nowrap; }
+@media (max-width: 600px) {
+  .ov-head { grid-template-columns: auto minmax(0, 1fr); }
+  .ov-head > .tool { grid-column: 1 / -1; justify-self: start; }
+  .ov-n { min-width: 38px; height: 38px; font-size: 21px; }
+}

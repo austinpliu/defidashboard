@@ -228,6 +228,15 @@ A research aid, not a rating or a buy signal. Each check says how the data compa
 - **Dark mode** follows the operating system by default; the toggle remembers your choice in the browser.
 
 ## Later additions
+- **Overview hierarchy (Nov 2026).** The Overview used to be one flat grid of equal boxes. It is now grouped by relationship:
+  - **Headline strip:** two labelled pairs. "Money in DeFi" holds TVL and stablecoin supply; "Activity, last 24 hours" holds DEX volume and fees.
+  - **Today in one glance:** unchanged.
+  - **Three numbered groups,** each with a header saying what's in it and a link to the matching page:
+    1. **Your watchlist:** the protocol cards, then catalysts beside news. Catalysts belong to the watchlist, so they moved up from the bottom of the page.
+    2. **Where the money sits:** the TVL chart, chains beside chain growth, categories beside stablecoins.
+    3. **Activity and earnings:** daily DEX volume beside daily fees, then top protocols by fees beside the biggest movers.
+  - **Why the watchlist comes first:** it's the reader's own focus. The glance list above it already links to every market chart.
+  - **Empty groups:** a group with nothing in it this run (its data failed) is left out.
 
 - **Catalysts include peers** (tagged "peer"), because the watchlist protocols mostly vote on-chain and Snapshot only has active spaces for Compound and Morpho. Snapshot's "latest proposals" are fetched per space, so one busy space can't crowd out the others.
 - **Only http(s) links are ever shown or opened.** Feed links come from third-party RSS, so a `javascript:` URL could otherwise become a clickable link. The pipeline drops such items and the site refuses to render them.

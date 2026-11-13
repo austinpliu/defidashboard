@@ -64,6 +64,7 @@ _Updated as work happens. Last update: 12 Nov 2026 (session: content audit — p
   - **Catalysts:** launches are only a protocol's when the headline names it; filters for dated events and token economics.
   - **Tests:** 145 unit and pipeline tests.
   - **Verified** by loading each page in a browser and checking displayed figures against their source links (details in the pull request).
+- **Overview hierarchy (Nov 2026):** the headline strip is in two labelled pairs, and the boxes are in three labelled groups by relationship: your watchlist (with catalysts and news), where the money sits, and activity and earnings.
 
 ## Not done / known gaps
 - **Notes, not yet:**

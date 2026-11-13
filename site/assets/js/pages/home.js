@@ -1,5 +1,5 @@
 // 01 — Market overview
-import { h, openExternal, append, band, statTile, sparkline, sourceLine, subhead, segmented, extLink, pageError, term, unavailable } from '../ui.js';
+import { h, openExternal, append, band, statTile, sparkline, sourceLine, segmented, extLink, pageError, term, unavailable } from '../ui.js';
 import { chartCard, infoCard } from '../cards.js';
 import { loadMany } from '../data.js';
 import { primaryOf } from '../size.js';
@@ -33,6 +33,18 @@ function categoryNote(b) {
   return `Shares of the ${usd(b.headline)} headline DeFi TVL. Like the headline, this leaves out ${left.length ? left.join(', ') : 'nothing this run'}.${gap}${b.method === 'category-rules' ? ' (DefiLlama’s per-protocol flags were missing this run, so whole categories were left out by rule.)' : ''}`;
 }
 
+/** A labelled group of related boxes: a header (number, name, title, one line on what's in it, a link) over its own grid. */
+function group({ n, kicker, title, sub, link }) {
+  const grid = h('div', { class: 'grid' });
+  const el = h('section', { class: 'ov-group', 'aria-labelledby': `ov-g${n}` },
+    h('header', { class: 'ov-head' },
+      h('span', { class: 'ov-n', 'aria-hidden': 'true' }, String(n)),
+      h('div', { class: 'ov-titles' }, h('div', { class: 'kicker' }, kicker), h('h2', { id: `ov-g${n}` }, title), sub ? h('p', { class: 'ov-sub' }, sub) : null),
+      link || null),
+    grid);
+  return { el, grid };
+}
+
 export async function render(root) {
   const files = await loadMany(['market.json', 'index.json', 'catalysts.json', 'meta.json']);
   const m = files['market.json'].data;
@@ -55,20 +67,29 @@ export async function render(root) {
 
   // ---------- Headline strip ----------
   const spark = (series, days = 90) => sparkline((series ? trimDays(series, days) : []).map((p) => p[1]));
-  const stats = h('div', { class: 'stats' },
+  const statGroup = (label, tiles) => h('div', { class: 'stat-group', role: 'group', 'aria-label': label }, h('div', { class: 'stat-group-label' }, label), h('div', { class: 'stats' }, tiles));
+  const stats = h('div', { class: 'stat-groups' },
+    statGroup('Money in DeFi', [
     statTile({ label: 'Total DeFi TVL', termKey: 'defiTvl', raw: H.tvl?.value, value: usd(H.tvl?.value), deltas: [{ v: H.tvl?.change7d, per: '7d' }, { v: H.tvl?.change30d, per: '30d' }], spark: spark(H.tvl?.series), src: S[H.tvl?.src], unavailableReason: H.tvl?.unavailable }),
     statTile({ label: 'Stablecoin supply', termKey: 'stablecoins', raw: H.stablecoins?.value, value: usd(H.stablecoins?.value), deltas: [{ v: H.stablecoins?.change7d, per: '7d' }, { v: H.stablecoins?.change30d, per: '30d' }], spark: spark(H.stablecoins?.series), src: S[H.stablecoins?.src], unavailableReason: H.stablecoins?.unavailable }),
+    ]),
+    statGroup('Activity, last 24 hours', [
     statTile({ label: 'DEX volume, 24h', termKey: 'dexVolume', raw: H.dexVolume?.value, value: usd(H.dexVolume?.value), deltas: [{ v: H.dexVolume?.change7d, per: '7d vs prior 7d' }, { v: H.dexVolume?.change30d, per: '30d vs prior 30d' }], spark: spark(H.dexVolume?.series), src: S[H.dexVolume?.src], unavailableReason: H.dexVolume?.unavailable }),
     statTile({ label: 'Fees paid, 24h', termKey: 'fees', raw: H.fees?.value, value: usd(H.fees?.value), deltas: [{ v: H.fees?.change7d, per: '7d vs prior 7d' }, { v: H.fees?.change30d, per: '30d vs prior 30d' }], spark: spark(H.fees?.series), src: S[H.fees?.src], unavailableReason: H.fees?.unavailable }),
-  );
+    ]));
   root.append(stats);
 
   // "What the data says today": the headline of every chart below, in one list.
   const summary = h('section', { class: 'card summary-card', style: { marginTop: '18px' } });
   root.append(summary);
 
-  const grid = h('div', { class: 'grid', style: { marginTop: '18px' } });
-  root.append(grid);
+  // Related boxes are grouped: your watchlist and what's next for it, then where the money sits,
+  // then what it's used for. Groups follow the headline strip's two pairs.
+  const gWatch = group({ n: 1, kicker: 'Your watchlist', title: 'The protocols you follow', sub: 'Size, fees and price for each, then the votes, unlocks and events coming up, and the latest DeFi news.', link: h('a', { href: '#/protocols', class: 'tool' }, 'All protocol details →') });
+  const gMoney = group({ n: 2, kicker: 'Where the money sits', title: 'Value locked and stablecoins', sub: 'How much is deposited in DeFi, on which chains and in which kinds of protocol, and the stablecoins it runs on.', link: h('a', { href: '#/screener', class: 'tool' }, 'Every protocol in the Screener →') });
+  const gActivity = group({ n: 3, kicker: 'Activity and earnings', title: 'Trading, fees and the biggest movers', sub: 'What people swap and pay each day, which protocols earn the most, and whose deposits moved most this week.', link: h('a', { href: '#/compare', class: 'tool' }, 'Compare protocols →') });
+  const groups = h('div', { class: 'ov-groups' }, gWatch.el, gMoney.el, gActivity.el);
+  root.append(groups);
 
   // ---------- Total TVL ----------
   if (H.tvl?.series?.length) {
@@ -96,7 +117,7 @@ export async function render(root) {
       csvName: 'defi-tvl',
       table: () => ({ columns: [{ key: 'date', label: 'Date' }, { key: 'tvl', label: 'TVL (USD)', num: true, fmt: (v) => usd(v), csv: (r) => r.tvl }], rows: trimDays(full, range).slice().reverse().map(([ts, v]) => ({ date: date(ts), tvl: v })) }),
     });
-    grid.append(h('div', { class: 'span-12' }, card));
+    gMoney.grid.append(h('div', { class: 'span-12' }, card));
   }
 
   // ---------- Watchlist strip ----------
@@ -115,8 +136,7 @@ export async function render(root) {
       h('div', { class: 'w-spark' }, sparkline(p.tvlSpark, { height: 36 })),
     ));
     const srcs = [watch[0]?.srcTvl ? { ...watch[0].srcTvl, label: 'TVL & fees (each protocol page links its own endpoint)', page: 'https://defillama.com/', api: null } : null, idx.priceSnapshot ? { ...idx.priceSnapshot, label: 'token prices, one request for all tokens' } : watch.find((p) => p.srcPrice)?.srcPrice ? { ...watch.find((p) => p.srcPrice).srcPrice, label: 'token prices', page: 'https://www.coingecko.com/', api: null } : null].filter(Boolean);
-    grid.append(h('div', { class: 'span-12' },
-      subhead('Your watchlist', 'The protocols you follow', h('a', { href: '#/protocols', class: 'tool' }, 'All protocol details →')),
+    gWatch.grid.append(h('div', { class: 'span-12' },
       h('div', { class: 'watch-grid' }, cards),
       h('p', { class: 'src' }, 'Changes are 7-day. Sparkline: TVL over the last 30 days. Protocols without a TVL show tokenized assets or open interest instead (see Tokens › Size). '),
       sourceLine(srcs)));
@@ -126,7 +146,7 @@ export async function render(root) {
   const ch = m.chains;
   if (ch?.top?.length) {
     const top = ch.top.slice(0, 10);
-    grid.append(h('div', { class: 'span-6' }, chartCard({
+    gMoney.grid.append(h('div', { class: 'span-6' }, chartCard({
       kicker: 'Chains',
       termKey: 'chain',
       take: chainTakeaway(ch.top),
@@ -166,10 +186,11 @@ export async function render(root) {
       table: () => ({ columns: [{ key: 'date', label: 'Date' }, ...names.map((n) => ({ key: n, label: n, num: true, fmt: (v) => usd(v), csv: (r) => r[n] }))], rows: ch.history[names[0]].slice().reverse().map(([ts]) => ({ date: date(ts), ...Object.fromEntries(names.map((n) => [n, valueAt(ch.history[n], ts)])) })) }),
     });
     requestAnimationFrame(() => card.update({ legend: legend() }));
-    grid.append(h('div', { class: 'span-6' }, card));
+    gMoney.grid.append(h('div', { class: 'span-6' }, card));
   }
 
-  // ---------- Top protocols by fees / revenue ----------
+  // ---------- Top protocols by fees / revenue (placed in the activity group, after the daily totals) ----------
+  let topProtocolsCard = null;
   if (m.topFees?.list?.length || m.topRevenue?.list?.length) {
     let which = m.topFees?.list?.length ? 'fees' : 'revenue';
     const listFor = (w) => (w === 'fees' ? m.topFees : m.topRevenue);
@@ -191,10 +212,11 @@ export async function render(root) {
       csvName: 'top-protocols-fees',
       table: () => ({ columns: [{ key: 'name', label: 'Protocol' }, { key: 'category', label: 'Category' }, { key: 'total24h', label: '24h', num: true, fmt: (v) => usd(v), csv: (r) => r.total24h }, { key: 'total7d', label: '7d', num: true, fmt: (v) => usd(v), csv: (r) => r.total7d }, { key: 'total30d', label: '30d', num: true, fmt: (v) => usd(v), csv: (r) => r.total30d }, { key: 'change30dOver30d', label: '30d vs prior', num: true, fmt: (v) => pct(v) }], rows: listFor(which).list }),
     });
-    grid.append(h('div', { class: 'span-6' }, card));
+    topProtocolsCard = h('div', { class: 'span-6' }, card);
   }
 
-  // ---------- Stablecoins by issuer ----------
+  // ---------- Stablecoins by issuer (placed beside the categories) ----------
+  let stablecoinsCard = null;
   const st = m.stablecoins;
   if (st?.top?.length) {
     const hist = st.history || {};
@@ -239,16 +261,17 @@ export async function render(root) {
         table: () => ({ columns: [{ key: 'name', label: 'Stablecoin' }, { key: 'circulating', label: 'Supply', num: true, fmt: (v) => usd(v), csv: (r) => r.circulating }, { key: 'share', label: 'Share', num: true, fmt: (v) => pct(v, { signed: false }) }], rows: st.top }),
       });
     }
-    grid.append(h('div', { class: 'span-6' }, card));
+    stablecoinsCard = h('div', { class: 'span-6' }, card);
   }
 
-  // ---------- Biggest movers ----------
+  // ---------- Biggest movers (placed beside the top protocols) ----------
+  let moversCard = null;
   const mv = m.movers;
   if (mv?.gainers?.length) {
     const g = mv.gainers.slice(0, 7);
     const l = mv.losers.slice(0, 7).reverse();
     const items = [...g, ...l.filter((x) => !g.includes(x))].map((x) => ({ name: x.name, value: x.change7d, sub: `TVL ${usd(x.tvl)} · ${x.category}` }));
-    grid.append(h('div', { class: 'span-6' }, chartCard({
+    moversCard = h('div', { class: 'span-6' }, chartCard({
       kicker: 'Movers',
       termKey: 'movers',
       take: moversTakeaway(mv),
@@ -261,7 +284,7 @@ export async function render(root) {
       sources: S,
       csvName: 'biggest-movers',
       table: () => ({ columns: [{ key: 'name', label: 'Protocol' }, { key: 'category', label: 'Category' }, { key: 'tvl', label: 'TVL', num: true, fmt: (v) => usd(v), csv: (r) => r.tvl }, { key: 'change7d', label: '7d', num: true, fmt: (v) => pct(v) }, { key: 'change1d', label: '1d', num: true, fmt: (v) => pct(v) }, { key: 'page', label: 'DefiLlama', fmt: (v) => extLink(v, 'open') }], rows: [...mv.gainers, ...mv.losers] }),
-    })));
+    }));
   }
 
   // ---------- DEX volume & fees, daily ----------
@@ -286,12 +309,13 @@ export async function render(root) {
       csvName: key,
       table: () => ({ columns: [{ key: 'date', label: range === 90 ? 'Date' : 'Week ending' }, { key: 'v', label: `${label} (USD)`, num: true, fmt: (v) => usd(v), csv: (r) => r.v }], rows: data().slice().reverse().map(([ts, v]) => ({ date: date(ts), v })) }),
     });
-    grid.append(h('div', { class: 'span-6' }, card));
+    gActivity.grid.append(h('div', { class: 'span-6' }, card));
   }
+  gActivity.grid.append(...[topProtocolsCard, moversCard].filter(Boolean));
 
   // ---------- Categories ----------
   if (m.categories?.list?.length) {
-    grid.append(h('div', { class: 'span-6' }, chartCard({
+    gMoney.grid.append(h('div', { class: 'span-6' }, chartCard({
       kicker: 'Categories',
       termKey: 'category',
       take: categoryTakeaway(m.categories.list, m.categories.basis),
@@ -304,9 +328,10 @@ export async function render(root) {
       table: () => ({ columns: [{ key: 'category', label: 'Category' }, { key: 'tvl', label: 'TVL', num: true, fmt: (v) => usd(v), csv: (r) => r.tvl }, { key: 'share', label: 'Share', num: true, fmt: (v) => pct(v, { signed: false }) }, { key: 'count', label: 'Protocols', num: true }], rows: m.categories.list }),
     })));
   }
+  if (stablecoinsCard) gMoney.grid.append(stablecoinsCard);
 
   // ---------- fill the summary panel from the cards' own headlines ----------
-  const cards = [...grid.querySelectorAll('.chart-card')].filter((c) => c.querySelector('.takeaway .hl'));
+  const cards = [...groups.querySelectorAll('.chart-card')].filter((c) => c.querySelector('.takeaway .hl'));
   if (cards.length) {
     summary.append(
       h('div', { class: 'card-top' }, h('div', { class: 'kicker' }, 'Today in one glance'), h('span', { class: 'src', style: { margin: 0 } }, 'Generated from the charts below by simple rules — click one to jump to its chart')),
@@ -332,14 +357,14 @@ export async function render(root) {
     const list = h('div', {},
       upcoming.length ? h('ul', { class: 'feed' }, upcoming.map(row)) : h('p', { class: 'chart-note' }, 'No open or upcoming votes or dated events in the data right now. Most recent items:'),
       recent.length ? h('ul', { class: 'feed' }, recent.map(row)) : null);
-    grid.append(h('div', { class: 'span-6 acc-purple' }, infoCard({
+    gWatch.grid.append(h('div', { class: 'span-6 acc-purple' }, infoCard({
       kicker: 'Catalysts',
       take: catalystTakeaway(cat.items, now),
       fallback: 'What’s coming up for your watchlist',
       body: [list, h('p', { class: 'src' }, h('a', { href: '#/catalysts' }, 'See the full timeline and filters →'), ' Information, not predictions.')],
     })));
     const heads = (cat.headlines || []).slice(0, 8);
-    grid.append(h('div', { class: 'span-6' }, infoCard({
+    gWatch.grid.append(h('div', { class: 'span-6' }, infoCard({
       kicker: 'News',
       // counts every matching headline (older data files only know the ones listed)
       take: heads.length ? headlinesTakeaway({
@@ -354,4 +379,7 @@ export async function render(root) {
       src: heads.length ? [...new Set(heads.map((i) => i.src))].map((k) => cat.sources[k]).filter(Boolean).slice(0, 4) : null,
     })));
   }
+
+  // a group with nothing in it this run (its data failed) is left out
+  for (const g of [gWatch, gMoney, gActivity]) if (!g.grid.children.length) g.el.remove();
 }
