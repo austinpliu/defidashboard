@@ -1,10 +1,6 @@
 {
- "checkedAt": "2026-11-14T18:33:15.059Z",
+ "checkedAt": "2026-11-14T22:52:36.258Z",
  "links": [
-  {
-   "url": "https://defillama.com/yields/pool/bd335b46-3daf-4507-adb2-6fd4337ea33b",
-   "status": 404
-  },
   {
    "url": "https://github.com/DefiLlama/dimension-adapters/blob/master/aave.ts",
    "status": 404
