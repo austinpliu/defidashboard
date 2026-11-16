@@ -1,16 +1,32 @@
 {
- "checkedAt": "2026-11-16T07:04:09.676Z",
+ "checkedAt": "2026-11-16T22:39:06.271Z",
  "links": [
-  {
-   "url": "https://defillama.com/yields/pool/bd335b46-3daf-4507-adb2-6fd4337ea33b",
-   "status": 404
-  },
   {
    "url": "https://github.com/DefiLlama/dimension-adapters/blob/master/aave.ts",
    "status": 404
   },
   {
    "url": "https://github.com/DefiLlama/emissions-adapters",
+   "status": 404
+  },
+  {
+   "url": "https://www.geckoterminal.com/berachain/pools/0xc2424e90ff25ab492c4794d624684be45d495635",
+   "status": 404
+  },
+  {
+   "url": "https://www.geckoterminal.com/hydration/tokens/asset_registry%2F1000795",
+   "status": 404
+  },
+  {
+   "url": "https://www.geckoterminal.com/hyperliquid/pools/0x4c11b2d8bdd9e55b672a77f629737522",
+   "status": 404
+  },
+  {
+   "url": "https://www.geckoterminal.com/metis/tokens/0x58538e6a46e07434d7e7375bc268d3cb839c0133",
+   "status": 404
+  },
+  {
+   "url": "https://www.geckoterminal.com/near/tokens/c00e94cb662c3520282e6f5717214004a7f26888.factory.bridge.near",
    "status": 404
   }
  ]
