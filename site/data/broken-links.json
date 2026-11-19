@@ -1,5 +1,5 @@
 {
- "checkedAt": "2026-11-19T07:53:39.472Z",
+ "checkedAt": "2026-11-19T21:07:42.167Z",
  "links": [
   {
    "url": "https://github.com/DefiLlama/dimension-adapters/blob/master/aave.ts",
@@ -7,6 +7,22 @@
   },
   {
    "url": "https://github.com/DefiLlama/emissions-adapters",
+   "status": 404
+  },
+  {
+   "url": "https://www.geckoterminal.com/hydration/tokens/asset_registry%2F1000795",
+   "status": 404
+  },
+  {
+   "url": "https://www.geckoterminal.com/hyperliquid/pools/0x4c11b2d8bdd9e55b672a77f629737522",
+   "status": 404
+  },
+  {
+   "url": "https://www.geckoterminal.com/metis/tokens/0x58538e6a46e07434d7e7375bc268d3cb839c0133",
+   "status": 404
+  },
+  {
+   "url": "https://www.geckoterminal.com/near/tokens/c00e94cb662c3520282e6f5717214004a7f26888.factory.bridge.near",
    "status": 404
   }
  ]
